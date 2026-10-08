@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import pe.buildshield.ordering.application.OrderCommandService;
 import pe.buildshield.ordering.shared.messaging.EventEnvelope;
 import pe.buildshield.ordering.shared.messaging.IdempotentEventProcessor;
+import pe.buildshield.ordering.shared.tenant.TenantContext;
+import pe.buildshield.ordering.shared.tenant.TenantInfo;
 
 import java.util.UUID;
 
@@ -41,7 +43,12 @@ public class InventoryEventConsumer {
 
     @KafkaListener(topics = "${buildshield.messaging.consumes.inventory:buildshield.inventory}")
     public void onMessage(ConsumerRecord<String, String> record) {
-        processor.process(record, this::handle);
+        // La sesión JPA toma la organización al abrir la transacción del procesador: se fija antes, con la del evento,
+        // para que el pedido se lea con el filtro multiempresa correcto (@TenantId).
+        EventEnvelope envelope = processor.parse(record.value());
+        TenantContext.runAs(new TenantInfo(envelope.organizationId(),
+                envelope.actorId() == null ? TenantContext.SYSTEM_USER_ID : envelope.actorId(),
+                IdempotentEventProcessor.SYSTEM_ROLE), () -> processor.process(record, this::handle));
     }
 
     void handle(EventEnvelope event) {

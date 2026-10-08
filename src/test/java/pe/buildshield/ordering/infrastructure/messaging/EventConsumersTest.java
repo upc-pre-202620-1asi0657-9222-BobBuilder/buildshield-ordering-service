@@ -91,6 +91,7 @@ class EventConsumersTest {
     @Test
     void listeners_delegate_to_the_idempotent_processor() {
         var record = new org.apache.kafka.clients.consumer.ConsumerRecord<String, String>("t", 0, 0, "k", "{}");
+        org.mockito.Mockito.when(processor.parse("{}")).thenReturn(event("StockReserved", UUID.randomUUID(), Map.of()));
         organization.onMessage(record);
         inventory.onMessage(record);
         verify(processor, org.mockito.Mockito.times(2)).process(eq(record), any());
