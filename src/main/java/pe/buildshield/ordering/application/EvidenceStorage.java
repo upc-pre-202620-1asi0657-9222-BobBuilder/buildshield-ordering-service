@@ -3,7 +3,8 @@ package pe.buildshield.ordering.application;
 import java.util.UUID;
 
 /**
- * Puerto de la evidencia (foto del ticket de balanza del pesaje de salida o de llegada). En la arquitectura
+ * Puerto de la evidencia (foto del ticket de balanza del pesaje de salida o de llegada, y foto de una incidencia en
+ * ruta). En la arquitectura
  * objetivo lo implementa un adaptador de Amazon S3; en local y en pruebas, {@code EvidenceStorageAdapter}, que solo
  * valida y conserva la referencia. El dominio guarda únicamente la URL devuelta.
  */
@@ -16,4 +17,13 @@ public interface EvidenceStorage {
      * @throws pe.buildshield.ordering.shared.error.ValidationException si la referencia no es válida
      */
     String registerTicketPhoto(UUID ownerId, String ticketPhotoUrl);
+
+    /**
+     * Registra la foto de una incidencia en ruta (US32) y devuelve la URL con la que se consultará ({@code null} si no
+     * se envió).
+     *
+     * @param dispatchId despacho de la incidencia
+     * @throws pe.buildshield.ordering.shared.error.ValidationException si la referencia no es válida
+     */
+    String registerIncidentPhoto(UUID dispatchId, String photoUrl);
 }

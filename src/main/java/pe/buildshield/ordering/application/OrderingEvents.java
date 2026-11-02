@@ -137,12 +137,14 @@ public final class OrderingEvents {
     }
 
     public record TransitIncidentReported(UUID dispatchId, UUID incidentId, UUID orderId, String manifestCode,
-            UUID warehouseId, UUID worksiteId, String type, String typeLabel, String observation, Instant reportedAt) {
+            UUID warehouseId, UUID worksiteId, String type, String typeLabel, String observation, String photoUrl,
+            Instant reportedAt) {
 
         public static TransitIncidentReported of(Dispatch dispatch, TransitIncident incident) {
             return new TransitIncidentReported(dispatch.id(), incident.id(), dispatch.orderId(),
                     dispatch.manifestCode().value(), dispatch.warehouseId(), dispatch.worksiteId(),
-                    incident.type().name(), incident.type().label(), incident.observation(), incident.reportedAt());
+                    incident.type().name(), incident.type().label(), incident.observation(), incident.photoUrl(),
+                    incident.reportedAt());
         }
     }
 

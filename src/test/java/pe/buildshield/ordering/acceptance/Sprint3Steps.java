@@ -46,6 +46,24 @@ public class Sprint3Steps {
                 Map.of("type", incidentType(typeLabel), "observation", observation));
     }
 
+    @Cuando("registro una incidencia {string} en el despacho {string} con la observación {string} y la foto {string}")
+    public void reportIncidentWithPhoto(String typeLabel, String dispatch, String observation, String photo)
+            throws Exception {
+        session.send(post("/api/v1/dispatches/" + session.id(dispatch) + "/incidents"),
+                Map.of("type", incidentType(typeLabel), "observation", observation, "photoUrl", photo));
+    }
+
+    @Entonces("la incidencia registrada tiene la foto {string}")
+    public void incidentHasPhoto(String photo) throws Exception {
+        assertThat(session.body().path("photoUrl").asText()).isEqualTo(photo);
+    }
+
+    @Entonces("la primera incidencia tiene la foto {string}")
+    public void firstIncidentHasPhoto(String photo) throws Exception {
+        session.expectStatus(200);
+        assertThat(session.body().get(0).path("photoUrl").asText()).isEqualTo(photo);
+    }
+
     @Dado("que registré una incidencia {string} en el despacho {string} con la observación {string}")
     public void incidentReported(String typeLabel, String dispatch, String observation) throws Exception {
         reportIncident(typeLabel, dispatch, observation);

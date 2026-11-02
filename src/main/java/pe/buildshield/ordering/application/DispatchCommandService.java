@@ -171,11 +171,15 @@ public class DispatchCommandService {
         return view(saved);
     }
 
-    /** US32: incidencia en ruta, solo mientras el despacho está EnTransito. Publica {@code TransitIncidentReported}. */
+    /**
+     * US32: incidencia en ruta, con foto opcional, solo mientras el despacho está EnTransito. Publica
+     * {@code TransitIncidentReported}.
+     */
     @Transactional
-    public IncidentView reportIncident(UUID dispatchId, IncidentType type, String observation) {
+    public IncidentView reportIncident(UUID dispatchId, IncidentType type, String observation, String photoUrl) {
         Dispatch dispatch = manageable(dispatchId);
-        TransitIncident incident = incidents.save(dispatch.reportIncident(type, observation,
+        String evidenceUrl = evidence.registerIncidentPhoto(dispatchId, photoUrl);
+        TransitIncident incident = incidents.save(dispatch.reportIncident(type, observation, evidenceUrl,
                 access.requester().userId(), clock.instant()));
         outbox.append(OrderingEvents.TRANSIT_INCIDENT_REPORTED, OrderingEvents.DISPATCH, dispatch.id(),
                 OrderingEvents.TransitIncidentReported.of(dispatch, incident));

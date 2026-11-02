@@ -201,10 +201,10 @@ class DispatchServicesTest extends ServiceTestBase {
         DispatchView dispatch = departed(dispatched(approved(), "20", null));
         asRosa();
         clock.setTo(NOW.plusSeconds(600));
-        IncidentView delay = dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico en la vía");
+        IncidentView delay = dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico en la vía", null);
         clock.setTo(NOW.plusSeconds(300));
         asAdmin();
-        IncidentView failure = dispatchCommands.reportIncident(dispatch.id(), IncidentType.VEHICLE_FAILURE, "Llanta");
+        IncidentView failure = dispatchCommands.reportIncident(dispatch.id(), IncidentType.VEHICLE_FAILURE, "Llanta", null);
 
         assertThat(delay.type()).isEqualTo(IncidentType.DELAY);
         assertThat(delay.reportedBy()).isEqualTo(ROSA);
@@ -227,7 +227,7 @@ class DispatchServicesTest extends ServiceTestBase {
         asLucia();
         assertThatThrownBy(() -> dispatchQueries.incidents(dispatch.id())).isInstanceOf(ResourceNotFoundException.class);
         asMaria();
-        assertThatThrownBy(() -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.OTHER, "Algo"))
+        assertThatThrownBy(() -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.OTHER, "Algo", null))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -235,7 +235,7 @@ class DispatchServicesTest extends ServiceTestBase {
     void incidents_only_in_transit() {
         DispatchView dispatch = dispatched(approved(), "20", null);
         asRosa();
-        assertThatThrownBy(() -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico"))
+        assertThatThrownBy(() -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico", null))
                 .isInstanceOf(InvalidDispatchTransitionException.class);
     }
 
@@ -311,5 +311,22 @@ class DispatchServicesTest extends ServiceTestBase {
         directory.locations.remove(central);
         asAdmin();
         assertThatThrownBy(() -> dispatchQueries.manifest(dispatch.id())).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void an_incident_keeps_its_optional_photo_and_publishes_it() {
+        DispatchView dispatch = departed(dispatched(approved(), "10", null));
+        asRosa();
+
+        IncidentView incident = dispatchCommands.reportIncident(dispatch.id(), IncidentType.DAMAGE, "Bolsas rotas",
+                " https://evidencias.example/foto.jpg ");
+
+        assertThat(incident.photoUrl()).isEqualTo("https://evidencias.example/foto.jpg");
+        assertThat(dispatchQueries.incidents(dispatch.id()).get(0).photoUrl())
+                .isEqualTo("https://evidencias.example/foto.jpg");
+        assertThat(outbox.last(OrderingEvents.TRANSIT_INCIDENT_REPORTED, OrderingEvents.TransitIncidentReported.class)
+                .photoUrl()).isEqualTo("https://evidencias.example/foto.jpg");
+        assertThat(dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Sin foto", null).photoUrl())
+                .isNull();
     }
 }

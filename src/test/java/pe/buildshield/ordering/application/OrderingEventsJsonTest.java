@@ -34,7 +34,7 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         DispatchView dispatch = departed(dispatched(approved, "50", "120"));
         asRosa();
         dispatchCommands.reportIncident(dispatch.id(), pe.buildshield.ordering.domain.model.dispatch.IncidentType.DELAY,
-                "Tráfico");
+                "Tráfico", "https://evidencias.example/foto.jpg");
         ReceptionView reception = opened(dispatch);
         receptionCommands.recordArrivalWeighing(reception.id(), qty("2530"), qty("1050.5"), null);
         receptionCommands.recordLine(reception.id(), receptionLine(reception, cement), qty("20"));
@@ -66,7 +66,7 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         assertFields("DispatchCancelled", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId",
                 "reason", "cancelledAt");
         assertFields("TransitIncidentReported", "dispatchId", "incidentId", "orderId", "manifestCode", "warehouseId",
-                "worksiteId", "type", "typeLabel", "observation", "reportedAt");
+                "worksiteId", "type", "typeLabel", "observation", "photoUrl", "reportedAt");
         assertFields("ReceptionOpened", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId",
                 "worksiteId");
         assertFields("ArrivalWeighed", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId",

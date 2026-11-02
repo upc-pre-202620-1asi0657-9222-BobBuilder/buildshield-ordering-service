@@ -31,6 +31,9 @@ public class TransitIncidentJpaEntity extends OrganizationScopedEntity {
     @Column(name = "observation", nullable = false, length = 500, updatable = false)
     private String observation;
 
+    @Column(name = "photo_url", length = 255, updatable = false)
+    private String photoUrl;
+
     @Column(name = "created_by", nullable = false, updatable = false)
     private UUID reportedBy;
 
@@ -45,11 +48,12 @@ public class TransitIncidentJpaEntity extends OrganizationScopedEntity {
         dispatchId = incident.dispatchId();
         type = incident.type();
         observation = incident.observation();
+        photoUrl = incident.photoUrl();
         reportedBy = incident.reportedBy();
         reportedAt = incident.reportedAt();
     }
 
     TransitIncident toDomain() {
-        return new TransitIncident(id, dispatchId, type, observation, reportedBy, reportedAt);
+        return new TransitIncident(id, dispatchId, type, observation, photoUrl, reportedBy, reportedAt);
     }
 }

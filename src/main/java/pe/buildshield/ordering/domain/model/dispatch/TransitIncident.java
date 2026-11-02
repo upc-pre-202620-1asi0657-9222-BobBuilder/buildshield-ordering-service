@@ -10,10 +10,10 @@ import java.util.UUID;
 
 /**
  * Incidencia registrada mientras el despacho está en tránsito (US32): retraso, falla, daño, accidente, cambio de
- * ruta u otra, con una observación de 3 a 500 caracteres. No se modifica. La crea {@link Dispatch#reportIncident}.
+ * ruta u otra, con una observación de 3 a 500 caracteres y, si la hay, la URL de su foto. No se modifica. La crea {@link Dispatch#reportIncident}.
  */
-public record TransitIncident(UUID id, UUID dispatchId, IncidentType type, String observation, UUID reportedBy,
-        Instant reportedAt) {
+public record TransitIncident(UUID id, UUID dispatchId, IncidentType type, String observation, String photoUrl,
+        UUID reportedBy, Instant reportedAt) {
 
     public static final String INVALID_INCIDENT = "INVALID_INCIDENT";
     static final int MIN_OBSERVATION = 3;

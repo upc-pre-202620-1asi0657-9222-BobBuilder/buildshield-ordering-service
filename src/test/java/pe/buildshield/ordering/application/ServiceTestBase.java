@@ -34,7 +34,17 @@ abstract class ServiceTestBase {
     final Fakes.Directory directory = new Fakes.Directory();
     final Fakes.Outbox outbox = new Fakes.Outbox();
     final AccessPolicy access = new AccessPolicy(directory);
-    final EvidenceStorage evidence = (owner, url) -> url == null || url.isBlank() ? null : url.trim();
+    final EvidenceStorage evidence = new EvidenceStorage() {
+        @Override
+        public String registerTicketPhoto(UUID owner, String url) {
+            return url == null || url.isBlank() ? null : url.trim();
+        }
+
+        @Override
+        public String registerIncidentPhoto(UUID dispatchId, String url) {
+            return registerTicketPhoto(dispatchId, url);
+        }
+    };
 
     final OrdersCommandService orderCommands = new OrdersCommandService(orders, directory, access, outbox, clock);
     final OrdersQueryService orderQueries = new OrdersQueryService(orders, access);

@@ -174,8 +174,8 @@ class RoleAuthorizationTest {
         when(dispatchCommands.recordDepartureWeighing(any(), any(), any(), any())).thenReturn(dispatch);
         when(dispatchCommands.depart(any())).thenReturn(dispatch);
         when(dispatchCommands.cancel(any(), any())).thenReturn(dispatch);
-        IncidentView incident = new IncidentView(ANY_ID, ANY_ID, IncidentType.DELAY, "Tráfico", ANY_ID, now);
-        when(dispatchCommands.reportIncident(any(), any(), any())).thenReturn(incident);
+        IncidentView incident = new IncidentView(ANY_ID, ANY_ID, IncidentType.DELAY, "Tráfico", null, ANY_ID, now);
+        when(dispatchCommands.reportIncident(any(), any(), any(), any())).thenReturn(incident);
         when(dispatchQueries.get(any())).thenReturn(dispatch);
         when(dispatchQueries.byManifest(any())).thenReturn(dispatch);
         when(dispatchQueries.list(any(), any())).thenReturn(List.of(dispatch));

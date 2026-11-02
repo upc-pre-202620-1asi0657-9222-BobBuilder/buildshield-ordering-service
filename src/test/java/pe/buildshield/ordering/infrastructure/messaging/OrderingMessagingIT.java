@@ -179,7 +179,7 @@ class OrderingMessagingIT {
         as(rosa, () -> dispatchCommands.recordDepartureWeighing(dispatch.id(), new BigDecimal("2550.5"),
                 new BigDecimal("1050.5"), null));
         as(rosa, () -> dispatchCommands.depart(dispatch.id()));
-        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico"));
+        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico", null));
         ReceptionView reception = as(jorge, () -> receptionCommands.start(dispatch.id(), null));
         as(jorge, () -> receptionCommands.recordArrivalWeighing(reception.id(), new BigDecimal("2530"),
                 new BigDecimal("1050.5"), null));

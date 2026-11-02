@@ -123,6 +123,7 @@ final class DispatchApiExamples {
               "type": "DELAY",
               "typeLabel": "Retraso",
               "observation": "Tráfico detenido en la Panamericana Sur",
+              "photoUrl": "https://evidencias.buildshield.pe/incidentes/0e1f2a3b.jpg",
               "reportedBy": "9c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
               "reportedAt": "2026-11-03T14:40:00Z"
             }""";

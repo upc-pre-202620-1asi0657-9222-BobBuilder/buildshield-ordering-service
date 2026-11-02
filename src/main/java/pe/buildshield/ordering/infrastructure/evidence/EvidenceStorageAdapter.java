@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * {@code EvidenceStorageAdapter} del C4 (v4), versión local: no sube archivos ni llama a AWS. Acepta una URL http(s)
- * de la foto del ticket ya subida por el cliente (por ejemplo, a la URL firmada que entregará el adaptador S3) y la
+ * de la foto del ticket o de la incidencia ya subida por el cliente (por ejemplo, a la URL firmada que entregará el adaptador S3) y la
  * conserva tal cual. En producción lo reemplaza el adaptador de Amazon S3 (no implementado todavía: requiere las
  * credenciales de la cuenta AWS del equipo); el puerto {@link EvidenceStorage} no cambia.
  */
@@ -22,18 +22,28 @@ import java.util.UUID;
 public class EvidenceStorageAdapter implements EvidenceStorage {
 
     public static final String INVALID_EVIDENCE_URL = "INVALID_EVIDENCE_URL";
-    static final int MAX_LENGTH = 500;
+    static final int TICKET_MAX_LENGTH = 500;
+    static final int INCIDENT_MAX_LENGTH = 255;
     private static final Logger log = LoggerFactory.getLogger(EvidenceStorageAdapter.class);
 
     @Override
     public String registerTicketPhoto(UUID ownerId, String ticketPhotoUrl) {
-        if (ticketPhotoUrl == null || ticketPhotoUrl.isBlank()) {
+        return register(ownerId, ticketPhotoUrl, "La foto del ticket", "ticketPhotoUrl", TICKET_MAX_LENGTH);
+    }
+
+    @Override
+    public String registerIncidentPhoto(UUID dispatchId, String photoUrl) {
+        return register(dispatchId, photoUrl, "La foto de la incidencia", "photoUrl", INCIDENT_MAX_LENGTH);
+    }
+
+    private static String register(UUID ownerId, String photoUrl, String label, String field, int maxLength) {
+        if (photoUrl == null || photoUrl.isBlank()) {
             return null;
         }
-        String url = ticketPhotoUrl.trim();
-        if (url.length() > MAX_LENGTH || !isHttp(url)) {
-            throw new ValidationException(INVALID_EVIDENCE_URL, "La foto del ticket debe ser una URL http o https",
-                    List.of(new ErrorDetail("ticketPhotoUrl", "URL http(s), máximo 500 caracteres")));
+        String url = photoUrl.trim();
+        if (url.length() > maxLength || !isHttp(url)) {
+            throw new ValidationException(INVALID_EVIDENCE_URL, label + " debe ser una URL http o https",
+                    List.of(new ErrorDetail(field, "URL http(s), máximo " + maxLength + " caracteres")));
         }
         log.debug("Evidencia de {} registrada localmente", ownerId);
         return url;

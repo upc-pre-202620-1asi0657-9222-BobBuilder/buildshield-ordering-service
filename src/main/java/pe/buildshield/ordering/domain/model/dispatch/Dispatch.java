@@ -154,11 +154,13 @@ public class Dispatch {
     }
 
     /** US32: incidencia en ruta; solo mientras el despacho está EnTransito. */
-    public TransitIncident reportIncident(IncidentType type, String observation, UUID by, Instant now) {
+    public TransitIncident reportIncident(IncidentType type, String observation, String photoUrl, UUID by,
+            Instant now) {
         if (!state.acceptsIncidents()) {
             throw new InvalidDispatchTransitionException(state.status(), "registrar una incidencia de");
         }
-        return new TransitIncident(UUID.randomUUID(), Objects.requireNonNull(id, "id"), type, observation, by, now);
+        return new TransitIncident(UUID.randomUUID(), Objects.requireNonNull(id, "id"), type, observation, photoUrl, by,
+                now);
     }
 
     /** Cantidad de cada línea de pedido que lleva el despacho. */

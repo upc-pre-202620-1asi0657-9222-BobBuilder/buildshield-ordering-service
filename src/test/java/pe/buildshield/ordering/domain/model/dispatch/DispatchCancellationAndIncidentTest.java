@@ -72,7 +72,7 @@ class DispatchCancellationAndIncidentTest {
     void incidents_are_reported_in_transit() {
         Dispatch dispatch = stored(DispatchStatus.IN_TRANSIT);
 
-        TransitIncident incident = dispatch.reportIncident(IncidentType.DELAY, "  Tráfico en la vía  ", ROSA, NOW);
+        TransitIncident incident = dispatch.reportIncident(IncidentType.DELAY, "  Tráfico en la vía  ", null, ROSA, NOW);
 
         assertThat(incident.id()).isNotNull();
         assertThat(incident.dispatchId()).isEqualTo(dispatch.id());
@@ -85,21 +85,21 @@ class DispatchCancellationAndIncidentTest {
     @ParameterizedTest
     @EnumSource(value = DispatchStatus.class, names = {"PREPARED", "RECEIVED", "CANCELLED"})
     void incidents_only_while_in_transit(DispatchStatus status) {
-        assertThatThrownBy(() -> stored(status).reportIncident(IncidentType.OTHER, "Algo pasó", ROSA, NOW))
+        assertThatThrownBy(() -> stored(status).reportIncident(IncidentType.OTHER, "Algo pasó", null, ROSA, NOW))
                 .isInstanceOf(InvalidDispatchTransitionException.class);
     }
 
     @Test
     void an_incident_needs_a_type_and_an_observation_from_3_to_500_characters() {
         Dispatch dispatch = stored(DispatchStatus.IN_TRANSIT);
-        assertThatThrownBy(() -> dispatch.reportIncident(null, "Algo pasó", ROSA, NOW))
+        assertThatThrownBy(() -> dispatch.reportIncident(null, "Algo pasó", null, ROSA, NOW))
                 .isInstanceOf(ValidationException.class)
                 .hasFieldOrPropertyWithValue("code", TransitIncident.INVALID_INCIDENT);
-        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, "ok", ROSA, NOW))
+        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, "ok", null, ROSA, NOW))
                 .isInstanceOf(ValidationException.class);
-        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, null, ROSA, NOW))
+        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, null, null, ROSA, NOW))
                 .isInstanceOf(ValidationException.class);
-        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, "x".repeat(501), ROSA, NOW))
+        assertThatThrownBy(() -> dispatch.reportIncident(IncidentType.DAMAGE, "x".repeat(501), null, ROSA, NOW))
                 .isInstanceOf(ValidationException.class);
     }
 

@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import pe.buildshield.ordering.application.DispatchCommandService;
 import pe.buildshield.ordering.application.DispatchQueryService;
 import pe.buildshield.ordering.application.DispatchView;
+import pe.buildshield.ordering.application.IncidentView;
 import pe.buildshield.ordering.application.OrdersCommandService;
 import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
@@ -112,14 +113,16 @@ class OrderingPersistenceIT {
         as(rosa, () -> dispatchCommands.recordDepartureWeighing(dispatch.id(), new BigDecimal("2550.5"),
                 new BigDecimal("1050.5"), "https://evidencias/t.jpg"));
         as(rosa, () -> dispatchCommands.depart(dispatch.id()));
-        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico"));
-        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.ROUTE_CHANGE, "Desvío"));
+        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.DELAY, "Tráfico",
+                "https://evidencias.example/foto.jpg"));
+        as(rosa, () -> dispatchCommands.reportIncident(dispatch.id(), IncidentType.ROUTE_CHANGE, "Desvío", null));
         DispatchView inTransit = as(jorge, () -> dispatchQueries.byManifest(dispatch.manifestCode()));
         assertThat(inTransit.status()).isEqualTo(DispatchStatus.IN_TRANSIT);
         assertThat(inTransit.incidentCount()).isEqualTo(2);
         assertThat(inTransit.departureWeighing().netKg()).isEqualByComparingTo("1500");
         assertThat(as(jorge, () -> dispatchQueries.list(order.id(), null))).hasSize(2);
-        assertThat(as(jorge, () -> dispatchQueries.incidents(dispatch.id()))).hasSize(2);
+        assertThat(as(jorge, () -> dispatchQueries.incidents(dispatch.id()))).extracting(IncidentView::photoUrl)
+                .containsExactly("https://evidencias.example/foto.jpg", null);
         assertThat(as(jorge, () -> dispatchQueries.manifest(dispatch.id())).worksite().address())
                 .isEqualTo("Av. Principal 100, Miraflores, Lima");
 

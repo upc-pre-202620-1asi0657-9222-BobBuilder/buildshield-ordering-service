@@ -224,11 +224,13 @@ class DispatchesController {
     @Operation(summary = "Registrar una incidencia en ruta",
             description = "US32: el administrador o el encargado del almacén de origen registra una incidencia (retraso, "
                     + "falla del vehículo, daño de la carga, accidente, cambio de ruta u otra) con una observación de 3 "
-                    + "a 500 caracteres, solo mientras el despacho está EnTransito. Se publica TransitIncidentReported.")
+                    + "a 500 caracteres y, si la hay, la URL de su foto, solo mientras el despacho está EnTransito. Se publica "
+                    + "TransitIncidentReported.")
     @ApiResponse(responseCode = "201", description = "Incidencia registrada",
             content = @Content(schema = @Schema(implementation = IncidentResource.class),
                     examples = @ExampleObject(value = DispatchApiExamples.INCIDENT)))
-    @ApiResponse(responseCode = "400", description = "Tipo desconocido u observación vacía o de más de 500 caracteres",
+    @ApiResponse(responseCode = "400", description = "Tipo desconocido, observación vacía o de más de 500 caracteres, o foto que no es una URL http(s) de "
+            + "hasta 255 caracteres (INVALID_EVIDENCE_URL)",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "404", description = "No existe o el usuario no es del almacén de origen",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -237,7 +239,8 @@ class DispatchesController {
     ResponseEntity<IncidentResource> reportIncident(
             @Parameter(description = "Id del despacho", example = DispatchApiExamples.DISPATCH_ID) @PathVariable UUID id,
             @Valid @RequestBody IncidentRequest request) {
-        IncidentView incident = commands.reportIncident(id, request.type(), request.observation());
+        IncidentView incident = commands.reportIncident(id, request.type(), request.observation(),
+                request.photoUrl());
         return ResponseEntity.created(URI.create("/api/v1/dispatches/" + id + "/incidents"))
                 .body(IncidentResource.of(incident));
     }
@@ -312,7 +315,10 @@ class DispatchesController {
             @Schema(description = "DELAY, VEHICLE_FAILURE, DAMAGE, ACCIDENT, ROUTE_CHANGE u OTHER", example = "DELAY")
             @NotNull IncidentType type,
             @Schema(example = "Tráfico detenido en la Panamericana Sur") @NotBlank @Size(min = 3, max = 500)
-            String observation) {
+            String observation,
+            @Schema(description = "URL http(s) de la foto de la incidencia ya subida; opcional",
+                    example = "https://evidencias.buildshield.pe/incidentes/0e1f2a3b.jpg") @Size(max = 255)
+            String photoUrl) {
     }
 
     @Schema(description = "Despacho con su estado, líneas, transportista, pesaje de salida, anulación e incidencias")
@@ -341,11 +347,13 @@ class DispatchesController {
     record IncidentResource(UUID id, UUID dispatchId,
             @Schema(example = "DELAY") String type,
             @Schema(description = "Tipo en español", example = "Retraso") String typeLabel,
-            String observation, UUID reportedBy, Instant reportedAt) {
+            String observation,
+            @Schema(description = "URL de la foto; null si no se envió") String photoUrl,
+            UUID reportedBy, Instant reportedAt) {
 
         static IncidentResource of(IncidentView view) {
             return new IncidentResource(view.id(), view.dispatchId(), view.type().name(), view.type().label(),
-                    view.observation(), view.reportedBy(), view.reportedAt());
+                    view.observation(), view.photoUrl(), view.reportedBy(), view.reportedAt());
         }
     }
 

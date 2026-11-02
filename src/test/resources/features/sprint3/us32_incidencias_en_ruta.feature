@@ -42,6 +42,17 @@ Característica: US32 Incidencias en ruta y US31 seguimiento de despachos en tr�
     Y la incidencia registrada es de tipo "Retraso"
     Y el despacho "D1" tiene 1 incidencia
 
+  Escenario: La incidencia guarda su foto y la devuelve
+    Cuando registro una incidencia "Daño de la carga" en el despacho "D1" con la observación "Bolsas rotas" y la foto "https://evidencias.example/d1.jpg"
+    Entonces la respuesta tiene estado 201
+    Y la incidencia registrada tiene la foto "https://evidencias.example/d1.jpg"
+    Cuando consulto las incidencias del despacho "D1"
+    Entonces la primera incidencia tiene la foto "https://evidencias.example/d1.jpg"
+
+  Escenario: La foto de la incidencia debe ser una URL http o https
+    Cuando registro una incidencia "Daño de la carga" en el despacho "D1" con la observación "Bolsas rotas" y la foto "ftp://evidencias.example/d1.jpg"
+    Entonces la operación es rechazada con estado 400 y código "INVALID_EVIDENCE_URL"
+
   Escenario: El seguimiento muestra los despachos en tránsito con sus incidencias en orden
     Dado que registré una incidencia "Retraso" en el despacho "D1" con la observación "Tráfico en la vía"
     Y que registré una incidencia "Cambio de ruta" en el despacho "D1" con la observación "Desvío por obras en la vía"
