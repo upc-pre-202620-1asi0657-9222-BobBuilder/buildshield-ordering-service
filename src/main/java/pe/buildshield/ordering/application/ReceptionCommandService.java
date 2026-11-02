@@ -189,7 +189,8 @@ public class ReceptionCommandService {
 
     /**
      * US29: pesaje de llegada, una vez por recepción y mientras no esté confirmada. Se compara con el neto de salida
-     * del despacho y con la menor tolerancia de sus materiales. Publica {@code ArrivalWeighed}.
+     * del despacho y con la menor tolerancia vigente de sus materiales, que queda guardada. Publica
+     * {@code ArrivalWeighed}.
      */
     @Transactional
     public ReceptionView.ArrivalWeighingView recordArrivalWeighing(UUID receptionId, BigDecimal grossKg,

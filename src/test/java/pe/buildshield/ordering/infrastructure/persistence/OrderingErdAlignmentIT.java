@@ -32,7 +32,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,35 +43,38 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * El esquema coincide con el ERD corregido y lo que salió de las tablas se sigue respondiendo igual: derivado con JOIN o
- * de las copias locales.
+ * El esquema coincide con el ERD ampliado por el equipo y lo que salió de las tablas se sigue respondiendo igual:
+ * derivado con JOIN o de las copias locales.
  */
 @OrderingIntegrationTest
 class OrderingErdAlignmentIT {
 
-    /** Columnas de cada tabla: las del ERD más las de DESVIACIONES.md, marcadas aparte. */
+    /** Columnas de cada tabla en el ERD ampliado. */
     private static final Map<String, Set<String>> ERD = Map.ofEntries(
             Map.entry("orders", Set.of("id", "organization_id", "worksite_id", "warehouse_id", "status", "required_date",
-                    "rejection_reason", "created_by", "created_at", "version", "updated_at", "updated_by")),
+                    "rejection_reason", "notes", "decided_by", "decided_at", "created_by", "created_at", "version",
+                    "updated_at", "updated_by")),
             Map.entry("order_lines", Set.of("id", "organization_id", "order_id", "material_id", "requested_qty",
                     "dispatched_qty", "cancelled_qty")),
             Map.entry("dispatches", Set.of("id", "organization_id", "order_id", "warehouse_id", "worksite_id", "type",
-                    "status", "manifest_code", "carrier_name", "carrier_document", "plate", "created_at", "version",
-                    "created_by", "updated_at", "updated_by")),
+                    "status", "manifest_code", "carrier_name", "carrier_document", "plate", "departed_at", "cancelled_at",
+                    "cancelled_by", "cancellation_reason", "created_at", "version", "created_by", "updated_at",
+                    "updated_by")),
             Map.entry("dispatch_lines", Set.of("id", "organization_id", "dispatch_id", "order_line_id", "material_id",
                     "quantity")),
             Map.entry("departure_weighings", Set.of("id", "organization_id", "dispatch_id", "gross_kg", "tare_kg",
                     "net_kg", "ticket_photo_url", "weighed_by", "weighed_at")),
             Map.entry("transit_incidents", Set.of("id", "organization_id", "dispatch_id", "type", "observation",
                     "photo_url", "created_by", "created_at")),
-            Map.entry("receptions", Set.of("id", "organization_id", "dispatch_id", "status", "confirmed_by",
-                    "confirmed_at", "version", "created_at", "created_by", "updated_at", "updated_by")),
+            Map.entry("receptions", Set.of("id", "organization_id", "dispatch_id", "status", "partial_count",
+                    "last_partial_at", "confirmed_by", "confirmed_at", "version", "created_at", "created_by",
+                    "updated_at", "updated_by")),
             Map.entry("reception_lines", Set.of("id", "organization_id", "reception_id", "dispatch_line_id",
-                    "received_qty", "shrinkage_pct")),
+                    "received_qty", "stocked_qty", "shrinkage_pct")),
             Map.entry("arrival_weighings", Set.of("id", "organization_id", "reception_id", "gross_kg", "tare_kg",
-                    "net_kg", "ticket_photo_url", "weighed_by", "weighed_at")),
+                    "net_kg", "tolerance_pct", "ticket_photo_url", "weighed_by", "weighed_at")),
             Map.entry("location_projection", Set.of("location_id", "organization_id", "type", "name", "address",
-                    "updated_at")),
+                    "active", "updated_at")),
             Map.entry("material_projection", Set.of("material_id", "organization_id", "sku", "name", "unit",
                     "tolerance_percent", "active", "updated_at")),
             Map.entry("assignment_projection", Set.of("assignment_id", "organization_id", "user_id", "location_id",
@@ -82,14 +84,6 @@ class OrderingErdAlignmentIT {
             Map.entry("processed_events", Set.of("event_id", "consumer", "processed_at")),
             Map.entry("idempotency_keys", Set.of("key", "organization_id", "endpoint", "request_hash", "status",
                     "response_body", "expires_at")));
-
-    /** DESVIACIONES.md: no se pueden derivar y sin ellas se rompe una función o el contrato. */
-    private static final Map<String, Set<String>> DEVIATIONS = Map.of(
-            "orders", Set.of("notes", "decided_by", "decided_at"),
-            "dispatches", Set.of("departed_at", "cancelled_at", "cancelled_by", "cancellation_reason"),
-            "receptions", Set.of("partial_count", "last_partial_at"),
-            "reception_lines", Set.of("stocked_qty"),
-            "location_projection", Set.of("active"));
 
     @Autowired
     JdbcTemplate jdbc;
@@ -146,11 +140,7 @@ class OrderingErdAlignmentIT {
                     actual.computeIfAbsent(rs.getString(1), ignored -> new HashSet<>()).add(rs.getString(2));
                 });
         assertThat(actual.keySet()).isEqualTo(ERD.keySet());
-        ERD.forEach((table, columns) -> {
-            Set<String> expected = new HashSet<>(columns);
-            expected.addAll(DEVIATIONS.getOrDefault(table, Set.of()));
-            assertThat(actual.get(table)).as(table).isEqualTo(expected);
-        });
+        ERD.forEach((table, columns) -> assertThat(actual.get(table)).as(table).isEqualTo(columns));
 
         assertThat(jdbc.queryForList("""
                 SELECT conrelid::regclass::text || '.' || a.attname || '>' || confrelid::regclass::text
@@ -164,14 +154,15 @@ class OrderingErdAlignmentIT {
 
         assertThat(nullable("dispatches", "order_id")).isTrue();
         assertThat(nullable("dispatch_lines", "order_line_id")).isTrue();
-        assertThat(nullable("departure_weighings", "ticket_photo_url")).isFalse();
-        assertThat(nullable("orders", "required_date")).isFalse();
+        assertThat(nullable("departure_weighings", "ticket_photo_url")).isTrue();
+        assertThat(nullable("orders", "required_date")).isTrue();
+        assertThat(nullable("arrival_weighings", "tolerance_pct")).isTrue();
     }
 
     @Test
     void what_left_the_tables_is_still_answered() {
-        OrderView order = approved(null);
-        assertThat(order.requiredDate()).isEqualTo(LocalDate.now(ZoneOffset.UTC));
+        OrderView order = approved(LocalDate.of(2026, 11, 10));
+        assertThat(order.requiredDate()).isEqualTo(LocalDate.of(2026, 11, 10));
         assertThat(order.requestedBy()).isEqualTo(jorge.userId());
         assertThat(order.placedAt()).isNotNull();
         assertThat(order.lines()).extracting(OrderView.LineView::sku).containsExactly("CEM-001", "FIE-012");
@@ -179,9 +170,6 @@ class OrderingErdAlignmentIT {
 
         DispatchView dispatch = departed(order, null);
         assertThat(dispatch.preparedAt()).isNotNull();
-        assertThat(jdbc.queryForObject("SELECT ticket_photo_url FROM departure_weighings", String.class))
-                .isEqualTo(DepartureWeighingJpaEntity.NO_TICKET_PHOTO);
-        assertThat(as(rosa, () -> dispatchQueries.get(dispatch.id())).departureWeighing().ticketPhotoUrl()).isNull();
 
         ReceptionView reception = as(jorge, () -> receptionCommands.start(dispatch.id(), null));
         assertThat(reception.orderId()).isEqualTo(order.id());
@@ -214,6 +202,59 @@ class OrderingErdAlignmentIT {
         assertThat(received.receivedAt()).isNotNull();
         assertThat(jdbc.queryForObject("SELECT confirmed_at FROM receptions", Timestamp.class).toInstant())
                 .isEqualTo(received.receivedAt());
+    }
+
+    @Test
+    void an_order_without_required_date_stores_and_publishes_null() throws Exception {
+        OrderView order = as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null,
+                null, List.of(new OrderCommandService.LineRequest(cement, BigDecimal.TEN)))));
+
+        assertThat(order.requiredDate()).isNull();
+        assertThat(jdbc.queryForObject("SELECT required_date FROM orders", LocalDate.class)).isNull();
+        assertThat(as(jorge, () -> orderQueries.get(order.id())).requiredDate()).isNull();
+        EventEnvelope event = json.readValue(jdbc.queryForObject("SELECT payload::text FROM outbox_events", String.class),
+                EventEnvelope.class);
+        assertThat(event.eventType()).isEqualTo("OrderRegistered");
+        assertThat(event.payload().has("requiredDate")).isTrue();
+        assertThat(event.payload().get("requiredDate").isNull()).isTrue();
+    }
+
+    @Test
+    void a_departure_weighing_without_photo_stores_null() {
+        DispatchView dispatch = departed(approved(null), null);
+
+        assertThat(jdbc.queryForObject("SELECT ticket_photo_url FROM departure_weighings", String.class)).isNull();
+        assertThat(as(rosa, () -> dispatchQueries.get(dispatch.id())).departureWeighing().ticketPhotoUrl()).isNull();
+    }
+
+    @Test
+    void a_later_tolerance_change_does_not_change_an_earlier_weighing() {
+        ReceptionView reception = weighedReception();
+        assertThat(jdbc.queryForObject("SELECT tolerance_pct FROM arrival_weighings", BigDecimal.class))
+                .isEqualByComparingTo("2.5");
+
+        setCementTolerance("0.5");
+        assertThatWeighingIs(reception, "2.5", true);
+
+        setCementTolerance("2.5");
+        ReceptionView narrow = weighedReception(new BigDecimal("1900"));
+        assertThatWeighingIs(narrow, "2.5", false);
+        setCementTolerance("50");
+        assertThatWeighingIs(narrow, "2.5", false);
+    }
+
+    @Test
+    void a_weighing_older_than_the_column_uses_the_current_tolerance_and_is_not_rewritten() {
+        ReceptionView reception = weighedReception();
+        jdbc.update("UPDATE arrival_weighings SET tolerance_pct = NULL");
+
+        assertThatWeighingIs(reception, "2.5", true);
+        setCementTolerance("0.5");
+        assertThatWeighingIs(reception, "0.5", false);
+
+        as(jorge, () -> receptionCommands.recordLine(reception.id(), reception.lines().get(0).id(), new BigDecimal("20")));
+        as(jorge, () -> receptionCommands.receivePartial(reception.id()));
+        assertThat(jdbc.queryForObject("SELECT tolerance_pct FROM arrival_weighings", BigDecimal.class)).isNull();
     }
 
     @Test
@@ -323,6 +364,30 @@ class OrderingErdAlignmentIT {
         UUID legacy = UUID.randomUUID();
         store.save(new IdempotencyRecord(org, legacy, "POST", "/api/v1/orders", 201, null, null, created));
         assertThat(store.find(org, legacy).orElseThrow().requestFingerprint()).isNull();
+    }
+
+    /** Salida de 1500 kg y llegada de 1480 kg (1,33 %), con cemento: tolerancia de 2,5 %. */
+    private ReceptionView weighedReception() {
+        return weighedReception(new BigDecimal("1980"));
+    }
+
+    private ReceptionView weighedReception(BigDecimal grossKg) {
+        DispatchView dispatch = departed(approved(null), null);
+        ReceptionView reception = as(jorge, () -> receptionCommands.start(dispatch.id(), null));
+        as(jorge, () -> receptionCommands.recordArrivalWeighing(reception.id(), grossKg, new BigDecimal("500"), null));
+        return reception;
+    }
+
+    private void setCementTolerance(String percent) {
+        jdbc.update("UPDATE material_projection SET tolerance_percent = ? WHERE material_id = ?",
+                new BigDecimal(percent), cement);
+    }
+
+    private void assertThatWeighingIs(ReceptionView reception, String tolerance, boolean within) {
+        ReceptionView.ArrivalWeighingView weighing = as(jorge, () -> receptionQueries.get(reception.id()))
+                .arrivalWeighing();
+        assertThat(weighing.tolerancePercent()).isEqualByComparingTo(tolerance);
+        assertThat(weighing.withinTolerance()).isEqualTo(within);
     }
 
     private boolean nullable(String table, String column) {

@@ -60,6 +60,16 @@ public class OrganizationSteps {
         material("MaterialRegistered", name, sku, unit(unit), tolerance, true);
     }
 
+    @Dado("que cambié la tolerancia de merma del material {string} a {string} %")
+    public void toleranceChanged(String sku, String tolerance) {
+        String[] data = materials.get(sku);
+        material("MaterialUpdated", data[0], sku, data[1], tolerance, true);
+        BigDecimal expected = new BigDecimal(tolerance);
+        await().atMost(TIMEOUT).pollInSameThread().pollInterval(Duration.ofMillis(50)).until(
+                () -> jdbc.queryForObject("SELECT tolerance_percent FROM material_projection WHERE material_id = ?",
+                        BigDecimal.class, session.id(sku)), value -> value.compareTo(expected) == 0);
+    }
+
     @Dado("que retiré del catálogo el material {string}")
     public void materialRetired(String sku) {
         String[] data = materials.get(sku.toUpperCase());

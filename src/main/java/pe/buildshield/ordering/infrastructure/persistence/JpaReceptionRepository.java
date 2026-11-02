@@ -17,8 +17,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * {@code ReceptionRepository} con Spring Data JPA; el filtro por organización lo pone Hibernate ({@code @TenantId}). Al
- * leer completa el pesaje de llegada con la menor tolerancia de los materiales, de {@code material_projection}.
+ * {@code ReceptionRepository} con Spring Data JPA; el filtro por organización lo pone Hibernate ({@code @TenantId}). Un
+ * pesaje de llegada anterior a V3 no guardó su tolerancia: se completa con la menor actual de los materiales, de
+ * {@code material_projection}.
  */
 @Repository
 @Transactional(readOnly = true)
@@ -66,7 +67,7 @@ class JpaReceptionRepository implements ReceptionRepository {
     }
 
     private Reception toDomain(ReceptionJpaEntity entity) {
-        if (!entity.hasArrivalWeighing()) {
+        if (!entity.needsCurrentTolerance()) {
             return entity.toDomain(null);
         }
         BigDecimal tolerance = directory.findMaterials(entity.materialIds()).values().stream()

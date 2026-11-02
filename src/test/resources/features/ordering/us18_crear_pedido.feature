@@ -35,6 +35,14 @@ Característica: US18 Crear pedido de materiales
     Entonces la respuesta tiene estado 201
     Y la respuesta muestra el pedido en estado "Registrado" con la fecha requerida "2026-11-10"
 
+  Escenario: El pedido sin fecha la deja nula
+    Dado que "jorge@andina.pe" inició sesión con la contraseña "Obra12345"
+    Cuando creo el pedido "P1" para la obra "Torre Norte" al almacén "Almacén Central" con:
+      | material | cantidad |
+      | CEM-001  | 50       |
+    Entonces la respuesta tiene estado 201
+    Y la respuesta muestra el pedido sin fecha requerida
+
   Esquema del escenario: Las cantidades deben ser mayores que cero
     Dado que "jorge@andina.pe" inició sesión con la contraseña "Obra12345"
     Cuando creo el pedido "P1" para la obra "Torre Norte" al almacén "Almacén Central" con:

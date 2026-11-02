@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * La migración V2 sobre datos reales de V1, en un esquema propio de la base de pruebas: nada se pierde en silencio y,
+ * Las migraciones sobre datos reales de V1, en un esquema propio de la base de pruebas: nada se pierde en silencio y,
  * si una copia no coincide con su origen, la migración se detiene.
  */
 @OrderingIntegrationTest
@@ -104,7 +104,7 @@ class OrderingErdMigrationIT {
         assertThat(dispatchRow).containsKey("departed_at").containsKey("cancellation_reason")
                 .doesNotContainKeys("prepared_at", "received_at");
         assertThat(jdbc.queryForObject(sql("SELECT ticket_photo_url FROM %s.departure_weighings WHERE dispatch_id = ?"),
-                String.class, dispatch)).isEqualTo(DepartureWeighingJpaEntity.NO_TICKET_PHOTO);
+                String.class, dispatch)).isNull();
 
         Map<String, Object> receptionRow = row("receptions", reception);
         assertThat(receptionRow).containsEntry("partial_count", 1).containsKey("last_partial_at")
@@ -113,7 +113,7 @@ class OrderingErdMigrationIT {
         assertThat(row("reception_lines", receptionLine))
                 .doesNotContainKeys("order_line_id", "material_id", "dispatched_qty");
         assertThat(jdbc.queryForMap(sql("SELECT * FROM %s.arrival_weighings WHERE reception_id = ?"), reception))
-                .doesNotContainKeys("departure_net_kg", "tolerance_pct");
+                .containsEntry("tolerance_pct", null).doesNotContainKeys("departure_net_kg");
 
         assertThat(jdbc.queryForMap(sql("SELECT created_by, created_at, photo_url FROM %s.transit_incidents WHERE id = ?"),
                 incident)).containsEntry("created_by", requester).containsEntry("photo_url", null);
@@ -145,6 +145,30 @@ class OrderingErdMigrationIT {
                 + "response_body->>'userId' AS owner FROM %s.idempotency_keys WHERE key = ?"), legacyKey))
                 .containsEntry("request_hash", "0".repeat(64)).containsEntry("status", "EXPIRED")
                 .containsEntry("body", null).containsEntry("owner", null);
+    }
+
+    @Test
+    void version_3_clears_only_the_photo_marker_and_keeps_the_dates_completed_by_version_2() {
+        seedDeliveredOrder();
+        flyway("2").migrate();
+        assertThat(jdbc.queryForObject(sql("SELECT ticket_photo_url FROM %s.departure_weighings WHERE dispatch_id = ?"),
+                String.class, dispatch)).isEqualTo("sin-foto");
+        UUID withPhoto = UUID.randomUUID();
+        jdbc.update(sql("INSERT INTO %s.dispatches (id, organization_id, warehouse_id, worksite_id, type, status, "
+                + "manifest_code, version, created_at, created_by, updated_at, updated_by) VALUES (?, ?, ?, ?, 'RETURN', "
+                + "'PREPARED', 'MAN-20261020-8KQ2M9XA', 0, ?, ?, ?, ?)"), withPhoto, org, warehouse, worksite, PLACED,
+                requester, PLACED, requester);
+        jdbc.update(sql("INSERT INTO %s.departure_weighings (id, organization_id, dispatch_id, gross_kg, tare_kg, net_kg, "
+                + "ticket_photo_url, weighed_at, weighed_by) VALUES (?, ?, ?, 2000, 500, 1500, "
+                + "'https://evidencias/t.jpg', ?, ?)"), UUID.randomUUID(), org, withPhoto, PLACED, requester);
+
+        flyway("latest").migrate();
+
+        assertThat(jdbc.queryForObject(sql("SELECT ticket_photo_url FROM %s.departure_weighings WHERE dispatch_id = ?"),
+                String.class, dispatch)).isNull();
+        assertThat(jdbc.queryForObject(sql("SELECT ticket_photo_url FROM %s.departure_weighings WHERE dispatch_id = ?"),
+                String.class, withPhoto)).isEqualTo("https://evidencias/t.jpg");
+        assertThat(row("orders", order).get("required_date")).isEqualTo(Date.valueOf(LocalDate.of(2026, 10, 20)));
     }
 
     @Test

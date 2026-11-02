@@ -26,7 +26,6 @@ import java.util.function.Function;
 /**
  * Tabla receptions con sus líneas (reception_lines) y su pesaje de llegada (arrival_weighings, a lo más uno: la
  * tabla tiene {@code reception_id} único). El pedido, la obra, el almacén y el manifiesto se leen del despacho.
- * {@code partial_count} y {@code last_partial_at} no están en el ERD ni se pueden derivar (DESVIACIONES.md).
  */
 @Entity
 @Table(name = "receptions")
@@ -92,22 +91,23 @@ public class ReceptionJpaEntity extends AuditableAbstractAggregateRoot<Reception
         }
     }
 
-    boolean hasArrivalWeighing() {
-        return !weighings.isEmpty();
+    /** Hay un pesaje de llegada anterior a V3, que no guardó su tolerancia. */
+    boolean needsCurrentTolerance() {
+        return weighings.stream().anyMatch(weighing -> !weighing.hasStoredTolerance());
     }
 
     List<UUID> materialIds() {
         return lines.stream().map(ReceptionLineJpaEntity::materialId).toList();
     }
 
-    /** @param tolerancePercent menor tolerancia de los materiales del despacho; solo se usa si hay pesaje de llegada */
-    Reception toDomain(BigDecimal tolerancePercent) {
+    /** @param currentTolerance menor tolerancia actual de los materiales; solo si el pesaje no guardó la suya */
+    Reception toDomain(BigDecimal currentTolerance) {
         List<ReceptionLine> domainLines = lines.stream().map(ReceptionLineJpaEntity::toDomain).toList();
         return Reception.restore(getId(), dispatch.getId(), dispatch.orderId(), dispatch.warehouseId(),
                 dispatch.worksiteId(), dispatch.manifestCode(), domainLines, status, partialCount, lastPartialAt,
                 confirmedBy, confirmedAt,
                 weighings.stream().findFirst()
-                        .map(weighing -> weighing.toDomain(dispatch.departureNetKg(), tolerancePercent)).orElse(null),
+                        .map(weighing -> weighing.toDomain(dispatch.departureNetKg(), currentTolerance)).orElse(null),
                 getVersion());
     }
 }

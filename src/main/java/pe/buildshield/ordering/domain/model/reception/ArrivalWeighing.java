@@ -15,7 +15,8 @@ import java.util.UUID;
  * mayor que cero. Se compara con el neto del pesaje de salida del despacho:
  * {@code diferencia = neto de salida - neto de llegada} y {@code diferencia % = diferencia / neto de salida × 100}
  * (2 decimales, HALF_UP). Está dentro de la tolerancia si {@code |diferencia %| <= tolerancia}, donde la
- * tolerancia es la menor de los materiales del despacho. Sin pesaje de salida la comparación es nula.
+ * tolerancia es la menor de los materiales del despacho al momento de pesar. Sin pesaje de salida la comparación
+ * es nula.
  */
 public record ArrivalWeighing(BigDecimal grossKg, BigDecimal tareKg, BigDecimal netKg, BigDecimal departureNetKg,
         BigDecimal tolerancePercent, String ticketPhotoUrl, Instant weighedAt, UUID weighedBy) {

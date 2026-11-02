@@ -47,7 +47,7 @@ Cada consumo es idempotente (`processed_events`).
 
 ## Endpoints (`/api/v1`)
 
-- Pedidos: `POST /orders` (encargado de obra, con `requiredDate` opcional: por defecto, el día de creación), `GET /orders`, `GET /orders/{id}`,
+- Pedidos: `POST /orders` (encargado de obra, con `requiredDate` opcional: si no se envía, queda nula), `GET /orders`, `GET /orders/{id}`,
   `POST /orders/{id}/approve`, `POST /orders/{id}/reject`.
 - Despachos: `POST /dispatches`, `GET /dispatches?orderId=&status=` (cada uno con `incidentCount`, US31),
   `GET /dispatches/{id}`, `GET /dispatches/by-manifest/{code}` (US26), `PATCH /dispatches/{id}/carrier`,
@@ -77,8 +77,8 @@ Si Kafka no está levantado el servicio arranca igual: los eventos quedan en el 
 
 ## Esquema
 
-`ordering_db` sigue el ERD corregido (`wiki/informe-avance2/er-corregido.md`, Figura 34.4). Lo que no coincide y su
-motivo están en `DESVIACIONES.md`.
+`ordering_db` sigue el ERD corregido (`wiki/informe-avance2/er-corregido.md`, Figura 34.4). Las diferencias que
+siguen abiertas están en `DESVIACIONES.md`.
 
 ## Pruebas
 

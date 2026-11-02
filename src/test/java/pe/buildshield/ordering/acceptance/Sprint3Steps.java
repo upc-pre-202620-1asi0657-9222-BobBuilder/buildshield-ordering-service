@@ -177,6 +177,13 @@ public class Sprint3Steps {
         assertThat(weighing.path("withinTolerance").asBoolean()).isEqualTo("sí".equals(within));
     }
 
+    @Entonces("la recepción {string} muestra el pesaje de llegada {string} dentro de la tolerancia de {string} %")
+    public void receptionShowsTolerance(String reception, String within, String tolerance) throws Exception {
+        JsonNode weighing = receptionJson(reception).path("arrivalWeighing");
+        assertThat(weighing.path("tolerancePercent").decimalValue()).isEqualByComparingTo(tolerance);
+        assertThat(weighing.path("withinTolerance").asBoolean()).isEqualTo("sí".equals(within));
+    }
+
     @Entonces("la recepción {string} muestra el pesaje de llegada con neto {string} kg")
     public void receptionShowsWeighing(String reception, String net) throws Exception {
         assertThat(receptionJson(reception).path("arrivalWeighing").path("netKg").decimalValue())

@@ -18,6 +18,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OrderServicesTest extends ServiceTestBase {
 
     @Test
+    void an_order_without_required_date_keeps_it_null_in_the_view_and_the_event() {
+        asJorge();
+        OrderView view = orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrderCommandService.LineRequest(cement, qty("50")))));
+
+        assertThat(view.requiredDate()).isNull();
+        assertThat(outbox.last(OrderingEvents.ORDER_REGISTERED, OrderingEvents.OrderRegistered.class).requiredDate())
+                .isNull();
+    }
+
+    @Test
     void site_manager_places_an_order_for_an_assigned_worksite_and_publishes_order_registered() {
         asJorge();
         OrderView view = orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, " Losa ",

@@ -38,7 +38,7 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
     @Column(name = "notes", length = 500, updatable = false)
     private String notes;
 
-    @Column(name = "required_date", nullable = false, updatable = false)
+    @Column(name = "required_date", updatable = false)
     private LocalDate requiredDate;
 
     @Enumerated(EnumType.STRING)

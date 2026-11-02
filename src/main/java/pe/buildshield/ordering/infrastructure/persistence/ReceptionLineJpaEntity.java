@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * Tabla reception_lines. Lo despachado, el material y la línea de pedido se leen de la línea del despacho.
- * {@code stocked_qty} no está en el ERD: sin ese dato la conformidad no sabe qué falta ingresar (DESVIACIONES.md).
+ * {@code stocked_qty}: sin ese dato la conformidad no sabe qué falta ingresar.
  */
 @Entity
 @Table(name = "reception_lines")

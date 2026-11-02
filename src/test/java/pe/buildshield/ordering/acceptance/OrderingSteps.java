@@ -117,6 +117,12 @@ public class OrderingSteps {
         assertThat(session.body().path("requiredDate").asText()).isEqualTo(date);
     }
 
+    @Entonces("la respuesta muestra el pedido sin fecha requerida")
+    public void responseShowsNoDate() throws Exception {
+        assertThat(session.body().has("requiredDate")).isTrue();
+        assertThat(session.body().get("requiredDate").isNull()).isTrue();
+    }
+
     @Entonces("la respuesta muestra el pedido en estado {string}")
     public void responseShowsStatus(String statusLabel) throws Exception {
         assertThat(session.body().path("statusLabel").asText()).isEqualTo(statusLabel);

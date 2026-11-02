@@ -85,8 +85,13 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         JsonNode confirmed = payload("ReceptionConfirmed");
         assertThat(confirmed.path("confirmedAt").asText()).matches("\\d{4}-\\d{2}-\\d{2}T.*Z");
         assertThat(confirmed.path("lines").get(0).path("deltaQuantity").isNumber()).isTrue();
-        assertThat(payload("OrderRegistered").path("requiredDate").asText()).matches("\\d{4}-\\d{2}-\\d{2}");
+        assertThat(payload("OrderRegistered").get("requiredDate").isNull()).as("pedido sin fecha").isTrue();
         assertThat(UUID.fromString(payload("OrderClosed").path("orderId").asText())).isEqualTo(order.id());
+
+        asJorge();
+        orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, java.time.LocalDate.of(2026, 11, 10),
+                List.of(new OrderCommandService.LineRequest(cement, qty("50")))));
+        assertThat(payload("OrderRegistered").path("requiredDate").asText()).isEqualTo("2026-11-10");
     }
 
     private JsonNode payload(String eventType) {

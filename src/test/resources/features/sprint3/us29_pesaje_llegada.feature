@@ -47,6 +47,11 @@ Característica: US29 Pesaje de llegada
     Cuando registro el pesaje de llegada de la recepción "R1" con bruto "2400" kg y tara "1000" kg
     Entonces el pesaje de llegada tiene neto "1400" kg, diferencia "100" kg ("6.67" %) y "no" dentro de la tolerancia de "2.5" %
 
+  Escenario: Un cambio posterior de la tolerancia no cambia el resultado del pesaje
+    Dado que registré el pesaje de llegada de la recepción "R1" con bruto "2530" kg y tara "1050.5" kg
+    Y que cambié la tolerancia de merma del material "CEM-001" a "0.5" %
+    Entonces la recepción "R1" muestra el pesaje de llegada "sí" dentro de la tolerancia de "2.5" %
+
   Escenario: La tara debe ser menor que el peso bruto
     Cuando registro el pesaje de llegada de la recepción "R1" con bruto "1000" kg y tara "1000" kg
     Entonces la operación es rechazada con estado 400 y código "INVALID_WEIGHING"

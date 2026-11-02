@@ -140,7 +140,7 @@ class OrderController {
             @NotNull UUID worksiteId,
             @Schema(description = "Almacén al que se pide") @NotNull UUID warehouseId,
             @Size(max = 500) String notes,
-            @Schema(description = "Fecha en que la obra necesita el material (opcional; por defecto, el día en que se crea el pedido)", example = "2026-11-10")
+            @Schema(description = "Fecha en que la obra necesita el material (opcional)", example = "2026-11-10")
             LocalDate requiredDate,
             @NotEmpty List<@Valid LineRequest> lines) {
     }
@@ -160,7 +160,8 @@ class OrderController {
             @Schema(example = "IN_REVIEW") String status,
             @Schema(description = "Estado en español", example = "EnRevision") String statusLabel,
             String notes,
-            @Schema(description = "Fecha en que la obra necesita el material", example = "2026-11-10") LocalDate requiredDate,
+            @Schema(description = "Fecha en que la obra necesita el material; nula si no se indicó", example = "2026-11-10", nullable = true)
+            LocalDate requiredDate,
             @Schema(description = "Motivo del rechazo del encargado o de la reserva de stock rechazada por inventario")
             String rejectionReason,
             Instant placedAt, UUID decidedBy, Instant decidedAt, List<LineResource> lines) {
