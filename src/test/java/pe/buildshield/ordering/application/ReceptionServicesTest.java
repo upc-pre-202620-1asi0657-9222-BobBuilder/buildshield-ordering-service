@@ -49,7 +49,7 @@ class ReceptionServicesTest extends ServiceTestBase {
         OrderingEvents.ReceptionOpened event = outbox.last(OrderingEvents.RECEPTION_OPENED,
                 OrderingEvents.ReceptionOpened.class);
         assertThat(event).isEqualTo(new OrderingEvents.ReceptionOpened(reception.id(), dispatch.id(), order.id(),
-                dispatch.manifestCode(), central, torre));
+                dispatch.manifestCode(), central, "Almacén Central", torre, "Torre Norte"));
     }
 
     @Test
@@ -245,7 +245,7 @@ class ReceptionServicesTest extends ServiceTestBase {
 
         assertThat(orderQueries.get(order.id()).status()).isEqualTo(OrderStatus.CLOSED);
         OrderingEvents.OrderFinished closed = outbox.last(OrderingEvents.ORDER_CLOSED, OrderingEvents.OrderFinished.class);
-        assertThat(closed).isEqualTo(new OrderingEvents.OrderFinished(order.id(), central, torre,
+        assertThat(closed).isEqualTo(new OrderingEvents.OrderFinished(order.id(), central, "Almacén Central", torre, "Torre Norte",
                 OrderingEvents.RECEPTION_COMPLETE));
         assertThat(outbox.events.get(outbox.events.size() - 1).aggregateType()).isEqualTo("ORDER");
     }

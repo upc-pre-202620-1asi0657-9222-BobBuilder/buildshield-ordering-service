@@ -48,8 +48,8 @@ abstract class ServiceTestBase {
 
     final OrdersCommandService orderCommands = new OrdersCommandService(orders, directory, access, outbox, clock);
     final OrdersQueryService orderQueries = new OrdersQueryService(orders, access);
-    final DispatchCommandService dispatchCommands = new DispatchCommandService(dispatches, incidents, orders, access,
-            evidence, outbox, clock, new Random(7));
+    final DispatchCommandService dispatchCommands = new DispatchCommandService(dispatches, incidents, orders,
+            directory, access, evidence, outbox, clock, new Random(7));
     final DispatchQueryService dispatchQueries = new DispatchQueryService(dispatches, incidents, orders, directory,
             access, content -> new byte[]{1, 2, 3});
     final ReceptionCommandService receptionCommands = new ReceptionCommandService(receptions, dispatches, orders,

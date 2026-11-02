@@ -27,6 +27,12 @@ public interface OrganizationDirectory {
         return findLocation(warehouseId).filter(location -> WAREHOUSE.equals(location.type()));
     }
 
+    /** Nombres de la obra y del almacén que viajan en los eventos; nulo el que aún no llegó a la copia local. */
+    default SiteNames siteNames(UUID worksiteId, UUID warehouseId) {
+        return new SiteNames(findLocation(worksiteId).map(Location::name).orElse(null),
+                findLocation(warehouseId).map(Location::name).orElse(null));
+    }
+
     Optional<Material> findMaterial(UUID materialId);
 
     /** Los materiales encontrados, por id (los que no existen no aparecen). */
@@ -45,6 +51,9 @@ public interface OrganizationDirectory {
      * @param address la que muestra el manifiesto (en una obra incluye distrito y ciudad)
      */
     record Location(UUID id, String type, String name, String address, boolean active) {
+    }
+
+    record SiteNames(String worksiteName, String warehouseName) {
     }
 
     /** Material del catálogo con su tolerancia de merma en %. */

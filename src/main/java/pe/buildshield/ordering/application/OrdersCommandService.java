@@ -67,7 +67,7 @@ public class OrdersCommandService {
                 command.requiredDate(), lines, clock.instant());
         Order saved = orders.save(order);
         outbox.append(OrderingEvents.ORDER_REGISTERED, OrderingEvents.ORDER, saved.id(),
-                OrderingEvents.OrderRegistered.of(saved));
+                OrderingEvents.OrderRegistered.of(saved, names(saved)));
         return OrderView.of(saved);
     }
 
@@ -81,7 +81,7 @@ public class OrdersCommandService {
         order.approve(access.requester().userId(), clock.instant());
         Order saved = orders.save(order);
         outbox.append(OrderingEvents.ORDER_APPROVED, OrderingEvents.ORDER, saved.id(),
-                OrderingEvents.OrderApproved.of(saved));
+                OrderingEvents.OrderApproved.of(saved, names(saved)));
         return OrderView.of(saved);
     }
 
@@ -92,7 +92,7 @@ public class OrdersCommandService {
         order.reject(access.requester().userId(), reason, clock.instant());
         Order saved = orders.save(order);
         outbox.append(OrderingEvents.ORDER_REJECTED, OrderingEvents.ORDER, saved.id(),
-                OrderingEvents.OrderFinished.of(saved, saved.rejectionReason()));
+                OrderingEvents.OrderFinished.of(saved, saved.rejectionReason(), names(saved)));
         return OrderView.of(saved);
     }
 
@@ -139,6 +139,10 @@ public class OrdersCommandService {
             return Optional.empty();
         }
         return order;
+    }
+
+    private OrganizationDirectory.SiteNames names(Order order) {
+        return directory.siteNames(order.worksiteId(), order.warehouseId());
     }
 
     private OrderLine line(LineRequest request) {

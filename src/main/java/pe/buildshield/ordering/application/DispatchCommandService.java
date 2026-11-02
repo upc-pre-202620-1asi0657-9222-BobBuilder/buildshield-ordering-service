@@ -48,6 +48,7 @@ public class DispatchCommandService {
     private final DispatchRepository dispatches;
     private final TransitIncidentRepository incidents;
     private final OrderRepository orders;
+    private final OrganizationDirectory directory;
     private final AccessPolicy access;
     private final EvidenceStorage evidence;
     private final OutboxWriter outbox;
@@ -56,15 +57,18 @@ public class DispatchCommandService {
 
     @Autowired
     public DispatchCommandService(DispatchRepository dispatches, TransitIncidentRepository incidents,
-            OrderRepository orders, AccessPolicy access, EvidenceStorage evidence, OutboxWriter outbox, Clock clock) {
-        this(dispatches, incidents, orders, access, evidence, outbox, clock, new SecureRandom());
+            OrderRepository orders, OrganizationDirectory directory, AccessPolicy access, EvidenceStorage evidence,
+            OutboxWriter outbox, Clock clock) {
+        this(dispatches, incidents, orders, directory, access, evidence, outbox, clock, new SecureRandom());
     }
 
     DispatchCommandService(DispatchRepository dispatches, TransitIncidentRepository incidents, OrderRepository orders,
-            AccessPolicy access, EvidenceStorage evidence, OutboxWriter outbox, Clock clock, RandomGenerator random) {
+            OrganizationDirectory directory, AccessPolicy access, EvidenceStorage evidence, OutboxWriter outbox, Clock clock,
+            RandomGenerator random) {
         this.dispatches = dispatches;
         this.incidents = incidents;
         this.orders = orders;
+        this.directory = directory;
         this.access = access;
         this.evidence = evidence;
         this.outbox = outbox;
@@ -98,7 +102,7 @@ public class DispatchCommandService {
         Dispatch saved = dispatches.save(Dispatch.prepare(order.id(), order.warehouseId(), order.worksiteId(), type,
                 ManifestCode.generate(now, random), lines, now));
         outbox.append(OrderingEvents.DISPATCH_PREPARED, OrderingEvents.DISPATCH, saved.id(),
-                OrderingEvents.DispatchPrepared.of(saved));
+                OrderingEvents.DispatchPrepared.of(saved, names(saved)));
         return DispatchView.of(saved, 0);
     }
 
@@ -109,7 +113,7 @@ public class DispatchCommandService {
         dispatch.assignCarrier(new Carrier(name, document, plate));
         Dispatch saved = dispatches.save(dispatch);
         outbox.append(OrderingEvents.DISPATCH_CARRIER_ASSIGNED, OrderingEvents.DISPATCH, saved.id(),
-                OrderingEvents.DispatchCarrierAssigned.of(saved));
+                OrderingEvents.DispatchCarrierAssigned.of(saved, names(saved)));
         return view(saved);
     }
 
@@ -132,7 +136,7 @@ public class DispatchCommandService {
             throw ex;
         }
         outbox.append(OrderingEvents.DISPATCH_DEPARTURE_WEIGHED, OrderingEvents.DISPATCH, saved.id(),
-                OrderingEvents.DispatchDepartureWeighed.of(saved));
+                OrderingEvents.DispatchDepartureWeighed.of(saved, names(saved)));
         return view(saved);
     }
 
@@ -146,7 +150,7 @@ public class DispatchCommandService {
         dispatch.depart(clock.instant());
         Dispatch saved = dispatches.save(dispatch);
         outbox.append(OrderingEvents.DISPATCH_DEPARTED, OrderingEvents.DISPATCH, saved.id(),
-                OrderingEvents.DispatchDeparted.of(saved));
+                OrderingEvents.DispatchDeparted.of(saved, names(saved)));
         return view(saved);
     }
 
@@ -167,7 +171,7 @@ public class DispatchCommandService {
         }
         Dispatch saved = dispatches.save(dispatch);
         outbox.append(OrderingEvents.DISPATCH_CANCELLED, OrderingEvents.DISPATCH, saved.id(),
-                OrderingEvents.DispatchCancelled.of(saved));
+                OrderingEvents.DispatchCancelled.of(saved, names(saved)));
         return view(saved);
     }
 
@@ -182,8 +186,12 @@ public class DispatchCommandService {
         TransitIncident incident = incidents.save(dispatch.reportIncident(type, observation, evidenceUrl,
                 access.requester().userId(), clock.instant()));
         outbox.append(OrderingEvents.TRANSIT_INCIDENT_REPORTED, OrderingEvents.DISPATCH, dispatch.id(),
-                OrderingEvents.TransitIncidentReported.of(dispatch, incident));
+                OrderingEvents.TransitIncidentReported.of(dispatch, incident, names(dispatch)));
         return IncidentView.of(incident);
+    }
+
+    private OrganizationDirectory.SiteNames names(Dispatch dispatch) {
+        return directory.siteNames(dispatch.worksiteId(), dispatch.warehouseId());
     }
 
     private DispatchView view(Dispatch dispatch) {

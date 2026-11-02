@@ -46,41 +46,50 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         asRosa();
         orderCommands.reject(duplicate.id(), "Duplicado");
 
-        assertFields("OrderRegistered", "orderId", "worksiteId", "warehouseId", "requestedBy", "requiredDate", "notes",
+        assertFields("OrderRegistered", "orderId", "worksiteId", "worksiteName", "warehouseId", "warehouseName", "requestedBy", "requiredDate", "notes",
                 "lines");
         assertLineFields("OrderRegistered", "orderLineId", "materialId", "sku", "unit", "quantity");
-        assertFields("OrderApproved", "orderId", "warehouseId", "worksiteId", "approvedBy", "lines");
+        assertFields("OrderApproved", "orderId", "warehouseId", "warehouseName", "worksiteId", "worksiteName", "approvedBy", "lines");
         assertLineFields("OrderApproved", "orderLineId", "materialId", "sku", "unit", "quantity");
-        assertFields("OrderRejected", "orderId", "warehouseId", "worksiteId", "reason");
-        assertFields("OrderClosed", "orderId", "warehouseId", "worksiteId", "reason");
-        assertFields("DispatchPrepared", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId", "type",
+        assertFields("OrderRejected", "orderId", "warehouseId", "warehouseName", "worksiteId", "worksiteName", "reason");
+        assertFields("OrderClosed", "orderId", "warehouseId", "warehouseName", "worksiteId", "worksiteName", "reason");
+        assertFields("DispatchPrepared", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName", "type",
                 "lines");
         assertLineFields("DispatchPrepared", "dispatchLineId", "orderLineId", "materialId", "quantity");
-        assertFields("DispatchCarrierAssigned", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId",
+        assertFields("DispatchCarrierAssigned", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "carrierName", "carrierDocument", "plate");
-        assertFields("DispatchDepartureWeighed", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId",
+        assertFields("DispatchDepartureWeighed", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "grossKg", "tareKg", "netKg", "ticketPhotoUrl");
-        assertFields("DispatchDeparted", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId",
+        assertFields("DispatchDeparted", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "departedAt", "lines");
         assertLineFields("DispatchDeparted", "dispatchLineId", "orderLineId", "materialId", "quantity");
-        assertFields("DispatchCancelled", "dispatchId", "orderId", "manifestCode", "warehouseId", "worksiteId",
+        assertFields("DispatchCancelled", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "reason", "cancelledAt");
-        assertFields("TransitIncidentReported", "dispatchId", "incidentId", "orderId", "manifestCode", "warehouseId",
-                "worksiteId", "type", "typeLabel", "observation", "photoUrl", "reportedAt");
-        assertFields("ReceptionOpened", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId",
-                "worksiteId");
-        assertFields("ArrivalWeighed", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId",
-                "worksiteId", "grossKg", "tareKg", "netKg", "departureNetKg", "differenceKg", "differencePercent",
+        assertFields("TransitIncidentReported", "dispatchId", "incidentId", "orderId", "manifestCode", "warehouseId", "warehouseName",
+                "worksiteId", "worksiteName", "type", "typeLabel", "observation", "photoUrl", "reportedAt");
+        assertFields("ReceptionOpened", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName",
+                "worksiteId", "worksiteName");
+        assertFields("ArrivalWeighed", "receptionId", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName",
+                "worksiteId", "worksiteName", "grossKg", "tareKg", "netKg", "departureNetKg", "differenceKg", "differencePercent",
                 "tolerancePercent", "withinTolerance");
         assertFields("ReceptionPartiallyReceived", "receptionId", "dispatchId", "orderId", "manifestCode",
-                "warehouseId", "worksiteId", "partialCount", "lines");
-        assertLineFields("ReceptionPartiallyReceived", "receptionLineId", "orderLineId", "materialId",
+                "warehouseId", "warehouseName", "worksiteId", "worksiteName", "partialCount", "lines");
+        assertLineFields("ReceptionPartiallyReceived", "receptionLineId", "dispatchLineId", "orderLineId", "materialId",
                 "receivedQuantity", "deltaQuantity");
-        assertFields("ReceptionConfirmed", "receptionId", "dispatchId", "orderId", "manifestCode", "worksiteId",
-                "warehouseId", "confirmedBy", "confirmedAt", "lines");
+        assertFields("ReceptionConfirmed", "receptionId", "dispatchId", "orderId", "manifestCode", "worksiteId", "worksiteName",
+                "warehouseId", "warehouseName", "confirmedBy", "confirmedAt", "lines");
         assertLineFields("ReceptionConfirmed", "receptionLineId", "dispatchLineId", "orderLineId", "materialId", "sku",
                 "materialName", "unit", "requested", "dispatched", "received", "deltaQuantity", "shrinkagePercent",
                 "tolerancePercent", "withinTolerance");
+
+        for (String type : List.of("OrderRegistered", "OrderApproved", "OrderRejected", "OrderClosed", "DispatchPrepared",
+                "DispatchCarrierAssigned", "DispatchDepartureWeighed", "DispatchDeparted", "DispatchCancelled",
+                "TransitIncidentReported", "ReceptionOpened", "ArrivalWeighed", "ReceptionPartiallyReceived",
+                "ReceptionConfirmed")) {
+            assertThat(payload(type).path("worksiteName").asText()).as(type).isEqualTo("Torre Norte");
+            assertThat(payload(type).path("warehouseName").asText()).as(type).isEqualTo("Almacén Central");
+        }
+        assertThat(payload("ReceptionPartiallyReceived").path("lines").get(0).path("dispatchLineId").isTextual()).isTrue();
 
         JsonNode confirmed = payload("ReceptionConfirmed");
         assertThat(confirmed.path("confirmedAt").asText()).matches("\\d{4}-\\d{2}-\\d{2}T.*Z");
@@ -92,6 +101,17 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, java.time.LocalDate.of(2026, 11, 10),
                 List.of(new OrdersCommandService.LineRequest(cement, qty("50")))));
         assertThat(payload("OrderRegistered").path("requiredDate").asText()).isEqualTo("2026-11-10");
+    }
+
+    @Test
+    void a_site_missing_from_the_local_copy_travels_as_a_null_name() {
+        OrderView order = placed();
+        directory.locations.remove(central);
+        asRosa();
+        orderCommands.approve(order.id());
+
+        assertThat(payload("OrderApproved").path("worksiteName").asText()).isEqualTo("Torre Norte");
+        assertThat(payload("OrderApproved").get("warehouseName").isNull()).isTrue();
     }
 
     private JsonNode payload(String eventType) {

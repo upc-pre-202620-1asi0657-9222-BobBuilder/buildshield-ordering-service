@@ -155,7 +155,8 @@ class OrderServicesTest extends ServiceTestBase {
 
         assertThat(rejected.status()).isEqualTo(OrderStatus.CANCELLED);
         OrderingEvents.OrderFinished event = outbox.last(OrderingEvents.ORDER_REJECTED, OrderingEvents.OrderFinished.class);
-        assertThat(event).isEqualTo(new OrderingEvents.OrderFinished(order.id(), central, torre, "Sin transporte"));
+        assertThat(event).isEqualTo(new OrderingEvents.OrderFinished(order.id(), central, "Almacén Central", torre,
+                "Torre Norte", "Sin transporte"));
         assertThatThrownBy(() -> orderCommands.approve(order.id())).isInstanceOf(InvalidOrderTransitionException.class);
     }
 

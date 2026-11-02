@@ -1,5 +1,6 @@
 package pe.buildshield.ordering.application;
 
+import pe.buildshield.ordering.application.OrganizationDirectory.SiteNames;
 import pe.buildshield.ordering.domain.model.dispatch.Carrier;
 import pe.buildshield.ordering.domain.model.dispatch.DepartureWeighing;
 import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
@@ -17,7 +18,8 @@ import java.util.UUID;
 /**
  * Eventos de integración que publica ordering en el tópico {@code buildshield.ordering} (payload del sobre). Los
  * nombres de los campos son el contrato con inventory, discrepancy, notification y audit
- * ({@code wiki/informe-tf/notas-etapa-b1.md} §2): no se renombran.
+ * ({@code wiki/informe-tf/notas-etapa-b1.md} §2): no se renombran. Todos llevan los nombres de la obra y del almacén, y
+ * van en null si el lugar todavía no llegó a la copia local.
  */
 public final class OrderingEvents {
 
@@ -51,29 +53,35 @@ public final class OrderingEvents {
     public record OrderLinePayload(UUID orderLineId, UUID materialId, String sku, String unit, BigDecimal quantity) {
     }
 
-    public record OrderRegistered(UUID orderId, UUID worksiteId, UUID warehouseId, UUID requestedBy,
+    public record OrderRegistered(UUID orderId, UUID worksiteId, String worksiteName, UUID warehouseId,
+            String warehouseName, UUID requestedBy,
             LocalDate requiredDate, String notes, List<OrderLinePayload> lines) {
 
-        public static OrderRegistered of(Order order) {
-            return new OrderRegistered(order.id(), order.worksiteId(), order.warehouseId(), order.requestedBy(),
+        public static OrderRegistered of(Order order, SiteNames names) {
+            return new OrderRegistered(order.id(), order.worksiteId(), names.worksiteName(), order.warehouseId(),
+                names.warehouseName(), order.requestedBy(),
                     order.requiredDate(), order.notes(), orderLines(order));
         }
     }
 
-    public record OrderApproved(UUID orderId, UUID warehouseId, UUID worksiteId, UUID approvedBy,
+    public record OrderApproved(UUID orderId, UUID warehouseId, String warehouseName, UUID worksiteId,
+            String worksiteName, UUID approvedBy,
             List<OrderLinePayload> lines) {
 
-        public static OrderApproved of(Order order) {
-            return new OrderApproved(order.id(), order.warehouseId(), order.worksiteId(), order.decidedBy(),
+        public static OrderApproved of(Order order, SiteNames names) {
+            return new OrderApproved(order.id(), order.warehouseId(), names.warehouseName(), order.worksiteId(),
+                names.worksiteName(), order.decidedBy(),
                     orderLines(order));
         }
     }
 
     /** {@code OrderRejected} (rechazo del encargado: el pedido queda Cancelado) y {@code OrderClosed}. */
-    public record OrderFinished(UUID orderId, UUID warehouseId, UUID worksiteId, String reason) {
+    public record OrderFinished(UUID orderId, UUID warehouseId, String warehouseName, UUID worksiteId,
+            String worksiteName, String reason) {
 
-        public static OrderFinished of(Order order, String reason) {
-            return new OrderFinished(order.id(), order.warehouseId(), order.worksiteId(), reason);
+        public static OrderFinished of(Order order, String reason, SiteNames names) {
+            return new OrderFinished(order.id(), order.warehouseId(), names.warehouseName(), order.worksiteId(),
+                names.worksiteName(), reason);
         }
     }
 
@@ -88,61 +96,74 @@ public final class OrderingEvents {
     }
 
     public record DispatchPrepared(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
-            UUID worksiteId, String type, List<DispatchLinePayload> lines) {
+            String warehouseName,
+            UUID worksiteId, String worksiteName, String type, List<DispatchLinePayload> lines) {
 
-        public static DispatchPrepared of(Dispatch dispatch) {
+        public static DispatchPrepared of(Dispatch dispatch, SiteNames names) {
             return new DispatchPrepared(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
-                    dispatch.warehouseId(), dispatch.worksiteId(), dispatch.type().name(), dispatchLines(dispatch));
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    dispatch.type().name(), dispatchLines(dispatch));
         }
     }
 
     public record DispatchCarrierAssigned(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
-            UUID worksiteId, String carrierName, String carrierDocument, String plate) {
+            String warehouseName,
+            UUID worksiteId, String worksiteName, String carrierName, String carrierDocument, String plate) {
 
-        public static DispatchCarrierAssigned of(Dispatch dispatch) {
+        public static DispatchCarrierAssigned of(Dispatch dispatch, SiteNames names) {
             Carrier carrier = dispatch.carrier().orElseThrow();
             return new DispatchCarrierAssigned(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
-                    dispatch.warehouseId(), dispatch.worksiteId(), carrier.name(), carrier.document(), carrier.plate());
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    carrier.name(), carrier.document(), carrier.plate());
         }
     }
 
     public record DispatchDepartureWeighed(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
-            UUID worksiteId, BigDecimal grossKg, BigDecimal tareKg, BigDecimal netKg, String ticketPhotoUrl) {
+            String warehouseName,
+            UUID worksiteId, String worksiteName, BigDecimal grossKg, BigDecimal tareKg, BigDecimal netKg,
+            String ticketPhotoUrl) {
 
-        public static DispatchDepartureWeighed of(Dispatch dispatch) {
+        public static DispatchDepartureWeighed of(Dispatch dispatch, SiteNames names) {
             DepartureWeighing weighing = dispatch.departureWeighing().orElseThrow();
             return new DispatchDepartureWeighed(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
-                    dispatch.warehouseId(), dispatch.worksiteId(), weighing.grossKg(), weighing.tareKg(),
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    weighing.grossKg(), weighing.tareKg(),
                     weighing.netKg(), weighing.ticketPhotoUrl());
         }
     }
 
     public record DispatchDeparted(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
-            UUID worksiteId, Instant departedAt, List<DispatchLinePayload> lines) {
+            String warehouseName,
+            UUID worksiteId, String worksiteName, Instant departedAt, List<DispatchLinePayload> lines) {
 
-        public static DispatchDeparted of(Dispatch dispatch) {
+        public static DispatchDeparted of(Dispatch dispatch, SiteNames names) {
             return new DispatchDeparted(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
-                    dispatch.warehouseId(), dispatch.worksiteId(), dispatch.departedAt(), dispatchLines(dispatch));
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    dispatch.departedAt(), dispatchLines(dispatch));
         }
     }
 
     public record DispatchCancelled(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
-            UUID worksiteId, String reason, Instant cancelledAt) {
+            String warehouseName,
+            UUID worksiteId, String worksiteName, String reason, Instant cancelledAt) {
 
-        public static DispatchCancelled of(Dispatch dispatch) {
+        public static DispatchCancelled of(Dispatch dispatch, SiteNames names) {
             Dispatch.Cancellation cancellation = dispatch.cancellation().orElseThrow();
             return new DispatchCancelled(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
-                    dispatch.warehouseId(), dispatch.worksiteId(), cancellation.reason(), cancellation.at());
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    cancellation.reason(), cancellation.at());
         }
     }
 
     public record TransitIncidentReported(UUID dispatchId, UUID incidentId, UUID orderId, String manifestCode,
-            UUID warehouseId, UUID worksiteId, String type, String typeLabel, String observation, String photoUrl,
+            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName, String type,
+            String typeLabel, String observation, String photoUrl,
             Instant reportedAt) {
 
-        public static TransitIncidentReported of(Dispatch dispatch, TransitIncident incident) {
+        public static TransitIncidentReported of(Dispatch dispatch, TransitIncident incident, SiteNames names) {
             return new TransitIncidentReported(dispatch.id(), incident.id(), dispatch.orderId(),
-                    dispatch.manifestCode().value(), dispatch.warehouseId(), dispatch.worksiteId(),
+                    dispatch.manifestCode().value(), dispatch.warehouseId(), names.warehouseName(),
+                    dispatch.worksiteId(), names.worksiteName(),
                     incident.type().name(), incident.type().label(), incident.observation(), incident.photoUrl(),
                     incident.reportedAt());
         }
@@ -156,42 +177,50 @@ public final class OrderingEvents {
     // ---------- Recepción ----------
 
     public record ReceptionOpened(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID warehouseId, UUID worksiteId) {
+            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName) {
 
-        public static ReceptionOpened of(Reception reception) {
+        public static ReceptionOpened of(Reception reception, SiteNames names) {
             return new ReceptionOpened(reception.id(), reception.dispatchId(), reception.orderId(),
-                    reception.manifestCode(), reception.warehouseId(), reception.worksiteId());
+                    reception.manifestCode(), reception.warehouseId(), names.warehouseName(), reception.worksiteId(),
+                    names.worksiteName());
         }
     }
 
     /** Los cuatro campos de comparación van en null si el despacho no tuvo pesaje de salida. */
     public record ArrivalWeighed(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID warehouseId, UUID worksiteId, BigDecimal grossKg, BigDecimal tareKg, BigDecimal netKg,
+            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName, BigDecimal grossKg,
+            BigDecimal tareKg, BigDecimal netKg,
             BigDecimal departureNetKg, BigDecimal differenceKg, BigDecimal differencePercent,
             BigDecimal tolerancePercent, Boolean withinTolerance) {
 
-        public static ArrivalWeighed of(Reception reception) {
+        public static ArrivalWeighed of(Reception reception, SiteNames names) {
             ArrivalWeighing weighing = reception.arrivalWeighing().orElseThrow();
             return new ArrivalWeighed(reception.id(), reception.dispatchId(), reception.orderId(),
-                    reception.manifestCode(), reception.warehouseId(), reception.worksiteId(), weighing.grossKg(),
+                    reception.manifestCode(), reception.warehouseId(), names.warehouseName(), reception.worksiteId(),
+                    names.worksiteName(), weighing.grossKg(),
                     weighing.tareKg(), weighing.netKg(), weighing.departureNetKg(), weighing.differenceKg(),
                     weighing.differencePercent(), weighing.tolerancePercent(), weighing.withinTolerance());
         }
     }
 
     /** @param receivedQuantity lo recibido acumulado de la línea */
-    public record PartialLinePayload(UUID receptionLineId, UUID orderLineId, UUID materialId,
+    public record PartialLinePayload(UUID receptionLineId, UUID dispatchLineId, UUID orderLineId, UUID materialId,
             BigDecimal receivedQuantity, BigDecimal deltaQuantity) {
     }
 
     /** Solo las líneas con diferencia mayor que cero. */
     public record ReceptionPartiallyReceived(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID warehouseId, UUID worksiteId, int partialCount, List<PartialLinePayload> lines) {
+            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName, int partialCount,
+            List<PartialLinePayload> lines) {
 
-        public static ReceptionPartiallyReceived of(Reception reception, List<Reception.LineDelta> deltas) {
+        public static ReceptionPartiallyReceived of(Reception reception, List<Reception.LineDelta> deltas,
+                SiteNames names) {
             return new ReceptionPartiallyReceived(reception.id(), reception.dispatchId(), reception.orderId(),
-                    reception.manifestCode(), reception.warehouseId(), reception.worksiteId(), reception.partialCount(),
-                    deltas.stream().map(delta -> new PartialLinePayload(delta.line().id(), delta.line().orderLineId(),
+                    reception.manifestCode(), reception.warehouseId(), names.warehouseName(), reception.worksiteId(),
+                    names.worksiteName(), reception.partialCount(),
+                    deltas.stream().map(delta -> new PartialLinePayload(delta.line().id(),
+                    delta.line().dispatchLineId(),
+                            delta.line().orderLineId(),
                             delta.line().materialId(), delta.line().receivedQty(), delta.delta())).toList());
         }
     }
@@ -208,7 +237,8 @@ public final class OrderingEvents {
     }
 
     public record ReceptionConfirmed(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID worksiteId, UUID warehouseId, UUID confirmedBy, Instant confirmedAt,
+            UUID worksiteId, String worksiteName, UUID warehouseId, String warehouseName, UUID confirmedBy,
+            Instant confirmedAt,
             List<ConfirmedLinePayload> lines) {
     }
 }

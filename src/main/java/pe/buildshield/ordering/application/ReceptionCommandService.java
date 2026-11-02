@@ -109,7 +109,7 @@ public class ReceptionCommandService {
             throw ex;
         }
         outbox.append(OrderingEvents.RECEPTION_OPENED, OrderingEvents.RECEPTION, saved.id(),
-                OrderingEvents.ReceptionOpened.of(saved));
+                OrderingEvents.ReceptionOpened.of(saved, names(saved)));
         return ReceptionView.of(saved);
     }
 
@@ -140,7 +140,7 @@ public class ReceptionCommandService {
             orders.save(order);
         }
         outbox.append(OrderingEvents.RECEPTION_PARTIALLY_RECEIVED, OrderingEvents.RECEPTION, saved.id(),
-                OrderingEvents.ReceptionPartiallyReceived.of(saved, deltas));
+                OrderingEvents.ReceptionPartiallyReceived.of(saved, deltas, names(saved)));
         return ReceptionView.of(saved);
     }
 
@@ -182,7 +182,7 @@ public class ReceptionCommandService {
                 confirmedEvent(saved, order, deltas));
         if (closing) {
             outbox.append(OrderingEvents.ORDER_CLOSED, OrderingEvents.ORDER, order.id(),
-                    OrderingEvents.OrderFinished.of(order, OrderingEvents.RECEPTION_COMPLETE));
+                    OrderingEvents.OrderFinished.of(order, OrderingEvents.RECEPTION_COMPLETE, names(saved)));
         }
         return ReceptionView.of(saved);
     }
@@ -216,7 +216,7 @@ public class ReceptionCommandService {
             throw ex;
         }
         outbox.append(OrderingEvents.ARRIVAL_WEIGHED, OrderingEvents.RECEPTION, saved.id(),
-                OrderingEvents.ArrivalWeighed.of(saved));
+                OrderingEvents.ArrivalWeighed.of(saved, names(saved)));
         return ReceptionView.ArrivalWeighingView.of(weighing);
     }
 
@@ -238,9 +238,10 @@ public class ReceptionCommandService {
                     line.receivedQty(), delta.delta(), line.shrinkagePercent(), tolerance,
                     Shrinkage.withinTolerance(line.shrinkagePercent(), tolerance));
         }).toList();
+        OrganizationDirectory.SiteNames names = names(reception);
         return new OrderingEvents.ReceptionConfirmed(reception.id(), reception.dispatchId(), reception.orderId(),
-                reception.manifestCode(), reception.worksiteId(), reception.warehouseId(), reception.confirmedBy(),
-                reception.confirmedAt(), lines);
+                reception.manifestCode(), reception.worksiteId(), names.worksiteName(), reception.warehouseId(),
+                names.warehouseName(), reception.confirmedBy(), reception.confirmedAt(), lines);
     }
 
     /**
@@ -260,6 +261,10 @@ public class ReceptionCommandService {
         deltas.stream().filter(delta -> delta.delta().signum() > 0)
                 .forEach(delta -> received.merge(delta.line().orderLineId(), delta.delta(), BigDecimal::add));
         return received;
+    }
+
+    private OrganizationDirectory.SiteNames names(Reception reception) {
+        return directory.siteNames(reception.worksiteId(), reception.warehouseId());
     }
 
     private Reception workable(UUID receptionId) {

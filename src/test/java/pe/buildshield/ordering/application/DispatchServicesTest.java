@@ -136,7 +136,7 @@ class DispatchServicesTest extends ServiceTestBase {
         when(failing.findById(dispatch.id())).thenReturn(dispatches.findById(dispatch.id()));
         when(failing.save(any())).thenThrow(new DataIntegrityViolationException("x",
                 new SQLException("duplicate key value violates unique constraint \"uk_departure_weighings_dispatch\"")));
-        DispatchCommandService service = new DispatchCommandService(failing, incidents, orders, access, evidence,
+        DispatchCommandService service = new DispatchCommandService(failing, incidents, orders, directory, access, evidence,
                 outbox, clock, new Random(1));
         asRosa();
         assertThatThrownBy(() -> service.recordDepartureWeighing(dispatch.id(), qty("10"), qty("1"), null))
@@ -145,7 +145,7 @@ class DispatchServicesTest extends ServiceTestBase {
         DispatchRepository other = mock(DispatchRepository.class);
         when(other.findById(dispatch.id())).thenReturn(dispatches.findById(dispatch.id()));
         when(other.save(any())).thenThrow(new DataIntegrityViolationException("x", new SQLException("otro")));
-        DispatchCommandService second = new DispatchCommandService(other, incidents, orders, access, evidence,
+        DispatchCommandService second = new DispatchCommandService(other, incidents, orders, directory, access, evidence,
                 outbox, clock, new Random(1));
         assertThatThrownBy(() -> second.recordDepartureWeighing(dispatch.id(), qty("10"), qty("1"), null))
                 .isInstanceOf(DataIntegrityViolationException.class);
