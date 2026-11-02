@@ -36,7 +36,7 @@ Restricciones que la figura no marca y protegen una regla: `uk_order_lines_mater
 
 - **`idempotency_keys.response_body` lleva más que la respuesta.** El ERD no tiene columnas para el estado HTTP, los encabezados, la ruta exacta ni el dueño de la clave, y sin ellos un reintento no se puede repetir ni validar. Van en ese JSON: `method`, `path`, `status`, `userId`, `role`, `contentType`, `location` y `bodyBase64`. Al vencer se quitan `bodyBase64`, `contentType` y `location`, y el resto se queda para seguir rechazando reintentos. `endpoint` guarda la ruta con `{id}` porque la exacta no cabe en 80 caracteres. `request_hash` en ceros marca un registro antiguo sin huella, que no se reproduce.
 - **`outbox_events.payload` guarda el sobre completo** (`aggregateType` y `actorId` incluidos), igual que en iam, porque el ERD no tiene esas columnas. Lo que llega a Kafka no cambia.
-- **`processed_events`**: los eventos anteriores a V2 se registraron para `OrganizationEventConsumer` y para `InventoryEventConsumer`, porque antes no se guardaba cuál los procesó. Así una reentrega se sigue descartando.
+- **`processed_events`**: los eventos anteriores a V2 se registraron para los dos consumidores de entonces, y V4 los pasa al nombre actual, `StockEventConsumer`. Así una reentrega se sigue descartando.
 
 ## Datos que pueden cambiar con el tiempo
 

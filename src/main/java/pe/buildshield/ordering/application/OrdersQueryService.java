@@ -13,12 +13,12 @@ import java.util.UUID;
  * obras; el encargado de almacén, los de sus almacenes. Lo demás responde 404.
  */
 @Service
-public class OrderQueryService {
+public class OrdersQueryService {
 
     private final OrderRepository orders;
     private final AccessPolicy access;
 
-    public OrderQueryService(OrderRepository orders, AccessPolicy access) {
+    public OrdersQueryService(OrderRepository orders, AccessPolicy access) {
         this.orders = orders;
         this.access = access;
     }

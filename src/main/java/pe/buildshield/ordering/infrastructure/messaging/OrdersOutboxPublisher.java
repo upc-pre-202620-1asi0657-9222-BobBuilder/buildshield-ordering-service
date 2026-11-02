@@ -17,9 +17,9 @@ import java.time.Clock;
  * outbox (pedidos, despachos, incidencias y recepciones; ver {@code OrderingEvents}).
  */
 @Component
-public class OrderingOutboxPublisher extends OutboxPublisher {
+public class OrdersOutboxPublisher extends OutboxPublisher {
 
-    public OrderingOutboxPublisher(JdbcTemplate jdbc, KafkaTemplate<String, String> kafka, ObjectMapper json,
+    public OrdersOutboxPublisher(JdbcTemplate jdbc, KafkaTemplate<String, String> kafka, ObjectMapper json,
             PlatformTransactionManager transactionManager, Clock clock, BuildshieldProperties properties) {
         super(jdbc, kafka, json, new TransactionTemplate(transactionManager), clock,
                 properties.getMessaging().getTopic(), properties.getMessaging().getBatchSize(),

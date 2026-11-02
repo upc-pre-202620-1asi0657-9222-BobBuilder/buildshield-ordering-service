@@ -130,7 +130,7 @@ class OrderingErdMigrationIT {
                 "\"actorId\": \"" + requester + "\"", "\"eventId\": \"" + event + "\"");
 
         assertThat(jdbc.queryForList(sql("SELECT consumer FROM %s.processed_events WHERE event_id = ?"), String.class,
-                processed)).containsExactlyInAnyOrder("InventoryEventConsumer", "OrganizationEventConsumer");
+                processed)).containsExactly("StockEventConsumer");
 
         Map<String, Object> keyRow = jdbc.queryForMap(sql("SELECT endpoint, request_hash, status, "
                 + "response_body->>'bodyBase64' AS body, response_body->>'userId' AS owner, "

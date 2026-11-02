@@ -89,8 +89,8 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         assertThat(UUID.fromString(payload("OrderClosed").path("orderId").asText())).isEqualTo(order.id());
 
         asJorge();
-        orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, java.time.LocalDate.of(2026, 11, 10),
-                List.of(new OrderCommandService.LineRequest(cement, qty("50")))));
+        orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, java.time.LocalDate.of(2026, 11, 10),
+                List.of(new OrdersCommandService.LineRequest(cement, qty("50")))));
         assertThat(payload("OrderRegistered").path("requiredDate").asText()).isEqualTo("2026-11-10");
     }
 

@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pe.buildshield.ordering.application.OrderCommandService;
-import pe.buildshield.ordering.application.OrderQueryService;
+import pe.buildshield.ordering.application.OrdersCommandService;
+import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.shared.error.ErrorResponse;
 
@@ -39,12 +39,12 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orders")
 @Tag(name = "Pedidos", description = "US18 crear, US20 aprobar o rechazar (saga de reserva de stock), US21 consultar estado")
 @SecurityRequirement(name = "bearer")
-class OrderController {
+class OrdersController {
 
-    private final OrderCommandService commands;
-    private final OrderQueryService queries;
+    private final OrdersCommandService commands;
+    private final OrdersQueryService queries;
 
-    OrderController(OrderCommandService commands, OrderQueryService queries) {
+    OrdersController(OrdersCommandService commands, OrdersQueryService queries) {
         this.commands = commands;
         this.queries = queries;
     }
@@ -67,9 +67,9 @@ class OrderController {
     @ApiResponse(responseCode = "409", description = "Almacén desactivado (SITE_INACTIVE) o material retirado "
             + "(MATERIAL_INACTIVE)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     ResponseEntity<OrderResource> place(@Valid @RequestBody PlaceOrderRequest request) {
-        OrderView created = commands.place(new OrderCommandService.PlaceOrder(request.worksiteId(),
+        OrderView created = commands.place(new OrdersCommandService.PlaceOrder(request.worksiteId(),
                 request.warehouseId(), request.notes(), request.requiredDate(), request.lines().stream()
-                .map(line -> new OrderCommandService.LineRequest(line.materialId(), line.quantity())).toList()));
+                .map(line -> new OrdersCommandService.LineRequest(line.materialId(), line.quantity())).toList()));
         return ResponseEntity.created(URI.create("/api/v1/orders/" + created.id())).body(OrderResource.of(created));
     }
 

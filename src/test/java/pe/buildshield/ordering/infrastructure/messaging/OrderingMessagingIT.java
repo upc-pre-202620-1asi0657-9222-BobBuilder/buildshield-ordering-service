@@ -15,8 +15,8 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import pe.buildshield.ordering.application.DispatchCommandService;
 import pe.buildshield.ordering.application.DispatchView;
-import pe.buildshield.ordering.application.OrderCommandService;
-import pe.buildshield.ordering.application.OrderQueryService;
+import pe.buildshield.ordering.application.OrdersCommandService;
+import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionView;
@@ -52,10 +52,10 @@ class OrderingMessagingIT {
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     @Autowired
-    OrderCommandService orderCommands;
+    OrdersCommandService orderCommands;
 
     @Autowired
-    OrderQueryService orderQueries;
+    OrdersQueryService orderQueries;
 
     @Autowired
     DispatchCommandService dispatchCommands;
@@ -64,7 +64,7 @@ class OrderingMessagingIT {
     ReceptionCommandService receptionCommands;
 
     @Autowired
-    OrderingOutboxPublisher publisher;
+    OrdersOutboxPublisher publisher;
 
     @Autowired
     KafkaTemplate<String, String> kafka;
@@ -105,9 +105,9 @@ class OrderingMessagingIT {
     }
 
     private OrderView place() {
-        return as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, new BigDecimal("50")),
-                        new OrderCommandService.LineRequest(steel, new BigDecimal("120"))))));
+        return as(jorge, () -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, new BigDecimal("50")),
+                        new OrdersCommandService.LineRequest(steel, new BigDecimal("120"))))));
     }
 
     private OrderStatus statusOf(UUID orderId) {

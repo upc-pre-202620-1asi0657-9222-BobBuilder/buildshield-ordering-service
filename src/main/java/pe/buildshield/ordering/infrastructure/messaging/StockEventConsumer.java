@@ -6,16 +6,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import pe.buildshield.ordering.application.OrdersCommandService;
 import pe.buildshield.ordering.infrastructure.persistence.JdbcOrganizationProjections;
 import pe.buildshield.ordering.shared.messaging.EventEnvelope;
 import pe.buildshield.ordering.shared.messaging.IdempotentEventProcessor;
+import pe.buildshield.ordering.shared.tenant.TenantContext;
+import pe.buildshield.ordering.shared.tenant.TenantInfo;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Consume el tópico {@code buildshield.organization} y actualiza las copias locales:
+ * {@code StockEventConsumer} del C4: consume los eventos de stock y los de obras, almacenes, materiales y asignaciones.
  *
+ * <p>Tópico {@code buildshield.inventory}, respuesta de inventario a la saga de reserva de stock (plan §6):
+ * <ul>
+ *   <li>{@code StockReserved}: el pedido pasa de Aprobando a EnRevision.</li>
+ *   <li>{@code StockReservationRejected}: el pedido vuelve a Registrado con {@code rejectionReason} = {@code reason}.</li>
+ * </ul>
+ * Si el pedido ya no está Aprobando el evento se ignora (se registra en el log).
+ *
+ * <p>Tópico {@code buildshield.organization}, copias locales:
  * <ul>
  *   <li>{@code LocationRegistered} y {@code LocationUpdated}: {@code location_projection} (obras y almacenes).</li>
  *   <li>{@code MaterialRegistered} y {@code MaterialUpdated}: {@code material_projection} (SKU, unidad y
@@ -24,12 +35,14 @@ import java.util.UUID;
  *       encargado; la desasignación borra la fila).</li>
  * </ul>
  *
- * Cada evento se procesa una sola vez ({@link IdempotentEventProcessor}). Los demás tipos se ignoran.
+ * Cada evento se procesa una sola vez ({@link IdempotentEventProcessor}); los demás tipos se ignoran.
  */
 @Component
-public class OrganizationEventConsumer {
+public class StockEventConsumer {
 
-    static final String CONSUMER = "OrganizationEventConsumer";
+    static final String CONSUMER = "StockEventConsumer";
+    static final String STOCK_RESERVED = "StockReserved";
+    static final String STOCK_RESERVATION_REJECTED = "StockReservationRejected";
     static final String LOCATION_REGISTERED = "LocationRegistered";
     static final String LOCATION_UPDATED = "LocationUpdated";
     static final String MATERIAL_REGISTERED = "MaterialRegistered";
@@ -37,22 +50,44 @@ public class OrganizationEventConsumer {
     static final String STAFF_ASSIGNED = "StaffAssigned";
     static final String STAFF_UNASSIGNED = "StaffUnassigned";
 
-    private static final Logger log = LoggerFactory.getLogger(OrganizationEventConsumer.class);
+    private static final Logger log = LoggerFactory.getLogger(StockEventConsumer.class);
 
     private final IdempotentEventProcessor processor;
+    private final OrdersCommandService orders;
     private final JdbcOrganizationProjections projections;
 
-    public OrganizationEventConsumer(IdempotentEventProcessor processor, JdbcOrganizationProjections projections) {
+    public StockEventConsumer(IdempotentEventProcessor processor, OrdersCommandService orders,
+            JdbcOrganizationProjections projections) {
         this.processor = processor;
+        this.orders = orders;
         this.projections = projections;
     }
 
-    @KafkaListener(topics = "${buildshield.messaging.consumes.organization:buildshield.organization}")
-    public void onMessage(ConsumerRecord<String, String> record) {
-        processor.process(CONSUMER, record, this::handle);
+    @KafkaListener(topics = "${buildshield.messaging.consumes.inventory:buildshield.inventory}")
+    public void onInventoryEvent(ConsumerRecord<String, String> record) {
+        // La sesión JPA toma la organización al abrir la transacción del procesador: se fija antes, con la del evento,
+        // para que el pedido se lea con el filtro multiempresa correcto (@TenantId).
+        EventEnvelope envelope = processor.parse(record.value());
+        TenantContext.runAs(new TenantInfo(envelope.organizationId(),
+                envelope.actorId() == null ? TenantContext.SYSTEM_USER_ID : envelope.actorId(),
+                IdempotentEventProcessor.SYSTEM_ROLE), () -> processor.process(CONSUMER, record, this::handleInventory));
     }
 
-    void handle(EventEnvelope event) {
+    @KafkaListener(topics = "${buildshield.messaging.consumes.organization:buildshield.organization}")
+    public void onOrganizationEvent(ConsumerRecord<String, String> record) {
+        processor.process(CONSUMER, record, this::handleOrganization);
+    }
+
+    void handleInventory(EventEnvelope event) {
+        JsonNode payload = event.payload();
+        switch (event.eventType()) {
+            case STOCK_RESERVED -> orders.confirmReservation(orderId(event));
+            case STOCK_RESERVATION_REJECTED -> orders.rejectReservation(orderId(event), text(payload, "reason"));
+            default -> log.debug("Evento {} ignorado por ordering", event.eventType());
+        }
+    }
+
+    void handleOrganization(EventEnvelope event) {
         JsonNode payload = event.payload();
         switch (event.eventType()) {
             case LOCATION_REGISTERED, LOCATION_UPDATED -> projections.upsertLocation(event.organizationId(),
@@ -71,6 +106,11 @@ public class OrganizationEventConsumer {
                     uuid(payload, "assignmentId"));
             default -> log.debug("Evento {} ignorado por ordering", event.eventType());
         }
+    }
+
+    private static UUID orderId(EventEnvelope event) {
+        JsonNode payload = event.payload();
+        return UUID.fromString(payload.hasNonNull("orderId") ? payload.get("orderId").asText() : event.aggregateId());
     }
 
     private static UUID uuid(JsonNode payload, String field) {

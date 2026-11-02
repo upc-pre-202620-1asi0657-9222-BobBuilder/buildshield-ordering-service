@@ -9,8 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import pe.buildshield.ordering.application.DispatchCommandService;
 import pe.buildshield.ordering.application.DispatchQueryService;
 import pe.buildshield.ordering.application.DispatchView;
-import pe.buildshield.ordering.application.OrderCommandService;
-import pe.buildshield.ordering.application.OrderQueryService;
+import pe.buildshield.ordering.application.OrdersCommandService;
+import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionQueryService;
@@ -92,10 +92,10 @@ class OrderingErdAlignmentIT {
     ObjectMapper json;
 
     @Autowired
-    OrderCommandService orderCommands;
+    OrdersCommandService orderCommands;
 
     @Autowired
-    OrderQueryService orderQueries;
+    OrdersQueryService orderQueries;
 
     @Autowired
     DispatchCommandService dispatchCommands;
@@ -206,8 +206,8 @@ class OrderingErdAlignmentIT {
 
     @Test
     void an_order_without_required_date_stores_and_publishes_null() throws Exception {
-        OrderView order = as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null,
-                null, List.of(new OrderCommandService.LineRequest(cement, BigDecimal.TEN)))));
+        OrderView order = as(jorge, () -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null,
+                null, List.of(new OrdersCommandService.LineRequest(cement, BigDecimal.TEN)))));
 
         assertThat(order.requiredDate()).isNull();
         assertThat(jdbc.queryForObject("SELECT required_date FROM orders", LocalDate.class)).isNull();
@@ -309,8 +309,8 @@ class OrderingErdAlignmentIT {
 
     @Test
     void the_outbox_payload_is_the_full_envelope() throws Exception {
-        OrderView order = as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, "Losa",
-                LocalDate.of(2026, 11, 10), List.of(new OrderCommandService.LineRequest(cement, BigDecimal.TEN)))));
+        OrderView order = as(jorge, () -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, "Losa",
+                LocalDate.of(2026, 11, 10), List.of(new OrdersCommandService.LineRequest(cement, BigDecimal.TEN)))));
 
         Map<String, Object> row = jdbc.queryForMap("SELECT id, aggregate_id, event_type, payload::text AS payload "
                 + "FROM outbox_events");
@@ -396,9 +396,9 @@ class OrderingErdAlignmentIT {
     }
 
     private OrderView approved(LocalDate requiredDate) {
-        OrderView order = as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null,
-                requiredDate, List.of(new OrderCommandService.LineRequest(steel, new BigDecimal("120")),
-                new OrderCommandService.LineRequest(cement, new BigDecimal("50"))))));
+        OrderView order = as(jorge, () -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null,
+                requiredDate, List.of(new OrdersCommandService.LineRequest(steel, new BigDecimal("120")),
+                new OrdersCommandService.LineRequest(cement, new BigDecimal("50"))))));
         as(rosa, () -> orderCommands.approve(order.id()));
         as(new TenantInfo(org, TenantContext.SYSTEM_USER_ID, "SYSTEM"), () -> orderCommands.confirmReservation(order.id()));
         return as(rosa, () -> orderQueries.get(order.id()));

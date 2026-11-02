@@ -30,9 +30,9 @@ import java.util.UUID;
  * <p>Cada cambio escribe su evento en el outbox en la misma transacción.
  */
 @Service
-public class OrderCommandService {
+public class OrdersCommandService {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderCommandService.class);
+    private static final Logger log = LoggerFactory.getLogger(OrdersCommandService.class);
 
     private final OrderRepository orders;
     private final OrganizationDirectory directory;
@@ -40,7 +40,7 @@ public class OrderCommandService {
     private final OutboxWriter outbox;
     private final Clock clock;
 
-    public OrderCommandService(OrderRepository orders, OrganizationDirectory directory, AccessPolicy access,
+    public OrdersCommandService(OrderRepository orders, OrganizationDirectory directory, AccessPolicy access,
             OutboxWriter outbox, Clock clock) {
         this.orders = orders;
         this.directory = directory;

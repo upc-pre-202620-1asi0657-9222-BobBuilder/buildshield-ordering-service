@@ -21,8 +21,8 @@ import pe.buildshield.ordering.application.DispatchQueryService;
 import pe.buildshield.ordering.application.DispatchView;
 import pe.buildshield.ordering.application.IncidentView;
 import pe.buildshield.ordering.application.ManifestView;
-import pe.buildshield.ordering.application.OrderCommandService;
-import pe.buildshield.ordering.application.OrderQueryService;
+import pe.buildshield.ordering.application.OrdersCommandService;
+import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionQueryService;
@@ -123,10 +123,10 @@ class RoleAuthorizationTest {
     RevokedTokenStore revokedTokens;
 
     @MockitoBean
-    OrderCommandService orderCommands;
+    OrdersCommandService orderCommands;
 
     @MockitoBean
-    OrderQueryService orderQueries;
+    OrdersQueryService orderQueries;
 
     @MockitoBean
     DispatchCommandService dispatchCommands;

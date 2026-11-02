@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 /**
  * Copias locales de organization ({@code location_projection}, {@code material_projection} y
- * {@code assignment_projection}), alimentadas por {@code OrganizationEventConsumer}. Son tablas JDBC, fuera del outbox
+ * {@code assignment_projection}), alimentadas por {@code StockEventConsumer}. Son tablas JDBC, fuera del outbox
  * y sin {@code @TenantId}: las lecturas filtran a mano por la organización del {@code TenantContext}.
  */
 @Component

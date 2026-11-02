@@ -7,8 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import pe.buildshield.ordering.application.DispatchCommandService;
 import pe.buildshield.ordering.application.DispatchQueryService;
 import pe.buildshield.ordering.application.DispatchView;
-import pe.buildshield.ordering.application.OrderCommandService;
-import pe.buildshield.ordering.application.OrderQueryService;
+import pe.buildshield.ordering.application.OrdersCommandService;
+import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionQueryService;
@@ -42,10 +42,10 @@ class OrderingPersistenceIT {
     JdbcTemplate jdbc;
 
     @Autowired
-    OrderCommandService orderCommands;
+    OrdersCommandService orderCommands;
 
     @Autowired
-    OrderQueryService orderQueries;
+    OrdersQueryService orderQueries;
 
     @Autowired
     DispatchCommandService dispatchCommands;
@@ -84,9 +84,9 @@ class OrderingPersistenceIT {
 
     @Test
     void the_whole_flow_is_stored_and_read_back() {
-        OrderView order = as(jorge, () -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, "Losa",
-                LocalDate.of(2026, 11, 10), List.of(new OrderCommandService.LineRequest(cement, new BigDecimal("50")),
-                new OrderCommandService.LineRequest(steel, new BigDecimal("120"))))));
+        OrderView order = as(jorge, () -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, "Losa",
+                LocalDate.of(2026, 11, 10), List.of(new OrdersCommandService.LineRequest(cement, new BigDecimal("50")),
+                new OrdersCommandService.LineRequest(steel, new BigDecimal("120"))))));
         assertThat(as(jorge, () -> orderQueries.get(order.id())).requiredDate()).isEqualTo(LocalDate.of(2026, 11, 10));
 
         as(rosa, () -> orderCommands.approve(order.id()));

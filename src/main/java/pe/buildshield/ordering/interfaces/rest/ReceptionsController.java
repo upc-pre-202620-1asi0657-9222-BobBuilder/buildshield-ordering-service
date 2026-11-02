@@ -42,12 +42,12 @@ import java.util.UUID;
 @Tag(name = "Recepciones", description = "US34 apertura por código, US35 recepción y cotejo, US37 conformidad, "
         + "US38 recepción parcial, US29 pesaje de llegada")
 @SecurityRequirement(name = "bearer")
-class ReceptionController {
+class ReceptionsController {
 
     private final ReceptionCommandService commands;
     private final ReceptionQueryService queries;
 
-    ReceptionController(ReceptionCommandService commands, ReceptionQueryService queries) {
+    ReceptionsController(ReceptionCommandService commands, ReceptionQueryService queries) {
         this.commands = commands;
         this.queries = queries;
     }

@@ -50,12 +50,12 @@ import java.util.UUID;
 @Tag(name = "Despachos", description = "US22 generar, US23 partición, US24 manifiesto, US25 anular, US26 consulta por "
         + "código, US27 pesaje de salida, US30 transportista, US31 seguimiento, US32 incidencias")
 @SecurityRequirement(name = "bearer")
-class DispatchController {
+class DispatchesController {
 
     private final DispatchCommandService commands;
     private final DispatchQueryService queries;
 
-    DispatchController(DispatchCommandService commands, DispatchQueryService queries) {
+    DispatchesController(DispatchCommandService commands, DispatchQueryService queries) {
         this.commands = commands;
         this.queries = queries;
     }

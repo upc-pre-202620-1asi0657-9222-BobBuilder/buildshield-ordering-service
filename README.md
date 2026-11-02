@@ -15,10 +15,10 @@ en obra (cotejo, recepción parcial, pesaje de llegada y conformidad). Contrato 
 
 ## Componentes (C4 de la v4)
 
-`OrderController`, `DispatchController`, `ReceptionController` (REST) → `OrderCommandService`, `OrderQueryService`,
+`OrdersController`, `DispatchesController`, `ReceptionsController` (REST) → `OrdersCommandService`, `OrdersQueryService`,
 `DispatchCommandService`, `DispatchQueryService`, `ReceptionCommandService`, `ReceptionQueryService` → agregados
 `Order`, `Dispatch`, `Reception` → `*Repository` (Spring Data JPA detrás de puertos del dominio). Además:
-`OrderingOutboxPublisher` (cada 500 ms), `OrganizationEventConsumer`, `InventoryEventConsumer`,
+`OrdersOutboxPublisher` (cada 500 ms), `StockEventConsumer` (tópicos de inventario y de organización),
 `EvidenceStorageAdapter` (local: valida y guarda la URL http(s) de la foto del ticket; en producción lo reemplaza un
 adaptador de Amazon S3, todavía no implementado) y `ZxingManifestQrCode` (QR del manifiesto).
 

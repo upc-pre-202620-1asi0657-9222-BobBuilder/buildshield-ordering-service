@@ -14,14 +14,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** US18, US20, US21 y la saga de reserva de stock (OrderCommandService y OrderQueryService). */
+/** US18, US20, US21 y la saga de reserva de stock (OrdersCommandService y OrdersQueryService). */
 class OrderServicesTest extends ServiceTestBase {
 
     @Test
     void an_order_without_required_date_keeps_it_null_in_the_view_and_the_event() {
         asJorge();
-        OrderView view = orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, qty("50")))));
+        OrderView view = orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, qty("50")))));
 
         assertThat(view.requiredDate()).isNull();
         assertThat(outbox.last(OrderingEvents.ORDER_REGISTERED, OrderingEvents.OrderRegistered.class).requiredDate())
@@ -31,8 +31,8 @@ class OrderServicesTest extends ServiceTestBase {
     @Test
     void site_manager_places_an_order_for_an_assigned_worksite_and_publishes_order_registered() {
         asJorge();
-        OrderView view = orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, " Losa ",
-                LocalDate.of(2026, 11, 10), List.of(new OrderCommandService.LineRequest(cement, qty("50")))));
+        OrderView view = orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, " Losa ",
+                LocalDate.of(2026, 11, 10), List.of(new OrdersCommandService.LineRequest(cement, qty("50")))));
 
         assertThat(view.id()).isNotNull();
         assertThat(view.status()).isEqualTo(OrderStatus.REGISTERED);
@@ -65,12 +65,12 @@ class OrderServicesTest extends ServiceTestBase {
     @Test
     void unassigned_or_unknown_worksite_is_404() {
         asLucia();
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, qty("1"))))))
                 .isInstanceOf(ResourceNotFoundException.class).hasFieldOrPropertyWithValue("code", "WORKSITE_NOT_FOUND");
         asJorge();
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(central, central, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(central, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, qty("1"))))))
                 .as("un almacén no es una obra").isInstanceOf(ResourceNotFoundException.class);
         assertThat(orders.stored).isEmpty();
         assertThat(outbox.events).isEmpty();
@@ -81,19 +81,19 @@ class OrderServicesTest extends ServiceTestBase {
         UUID closed = directory.warehouse("Cerrado", false);
         UUID retired = directory.material("OLD-001", "Retirado", "BAG", "1", false);
         asJorge();
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, closed, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, closed, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, qty("1"))))))
                 .isInstanceOf(ConflictException.class).hasFieldOrPropertyWithValue("code", "SITE_INACTIVE");
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, UUID.randomUUID(), null,
-                null, List.of(new OrderCommandService.LineRequest(cement, qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, UUID.randomUUID(), null,
+                null, List.of(new OrdersCommandService.LineRequest(cement, qty("1"))))))
                 .isInstanceOf(ResourceNotFoundException.class).hasFieldOrPropertyWithValue("code", "WAREHOUSE_NOT_FOUND");
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
-                List.of(new OrderCommandService.LineRequest(retired, qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(retired, qty("1"))))))
                 .isInstanceOf(ConflictException.class).hasFieldOrPropertyWithValue("code", "MATERIAL_INACTIVE");
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
-                List.of(new OrderCommandService.LineRequest(UUID.randomUUID(), qty("1"))))))
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
+                List.of(new OrdersCommandService.LineRequest(UUID.randomUUID(), qty("1"))))))
                 .isInstanceOf(ResourceNotFoundException.class).hasFieldOrPropertyWithValue("code", "MATERIAL_NOT_FOUND");
-        assertThatThrownBy(() -> orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, null, null,
+        assertThatThrownBy(() -> orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, null, null,
                 null))).isInstanceOf(ValidationException.class);
     }
 
@@ -174,8 +174,8 @@ class OrderServicesTest extends ServiceTestBase {
     void visibility_of_orders_by_role() {
         OrderView mine = placed();
         asLucia();
-        OrderView other = orderCommands.place(new OrderCommandService.PlaceOrder(sur, callao, null, null,
-                List.of(new OrderCommandService.LineRequest(cement, qty("10")))));
+        OrderView other = orderCommands.place(new OrdersCommandService.PlaceOrder(sur, callao, null, null,
+                List.of(new OrdersCommandService.LineRequest(cement, qty("10")))));
 
         asLucia();
         assertThat(orderQueries.list()).extracting(OrderView::id).containsExactly(other.id());

@@ -36,8 +36,8 @@ abstract class ServiceTestBase {
     final AccessPolicy access = new AccessPolicy(directory);
     final EvidenceStorage evidence = (owner, url) -> url == null || url.isBlank() ? null : url.trim();
 
-    final OrderCommandService orderCommands = new OrderCommandService(orders, directory, access, outbox, clock);
-    final OrderQueryService orderQueries = new OrderQueryService(orders, access);
+    final OrdersCommandService orderCommands = new OrdersCommandService(orders, directory, access, outbox, clock);
+    final OrdersQueryService orderQueries = new OrdersQueryService(orders, access);
     final DispatchCommandService dispatchCommands = new DispatchCommandService(dispatches, incidents, orders, access,
             evidence, outbox, clock, new Random(7));
     final DispatchQueryService dispatchQueries = new DispatchQueryService(dispatches, incidents, orders, directory,
@@ -96,9 +96,9 @@ abstract class ServiceTestBase {
     /** Pedido Registrado de Jorge: 50 de cemento y 120 de fierro al Almacén Central. */
     OrderView placed() {
         asJorge();
-        return orderCommands.place(new OrderCommandService.PlaceOrder(torre, central, "Losa", null, List.of(
-                new OrderCommandService.LineRequest(cement, qty("50")),
-                new OrderCommandService.LineRequest(steel, qty("120")))));
+        return orderCommands.place(new OrdersCommandService.PlaceOrder(torre, central, "Losa", null, List.of(
+                new OrdersCommandService.LineRequest(cement, qty("50")),
+                new OrdersCommandService.LineRequest(steel, qty("120")))));
     }
 
     /** Pedido aprobado por Rosa con el stock reservado (EnRevision). */

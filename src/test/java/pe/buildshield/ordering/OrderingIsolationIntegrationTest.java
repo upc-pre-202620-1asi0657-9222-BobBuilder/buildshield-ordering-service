@@ -10,7 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import pe.buildshield.ordering.application.OrderCommandService;
+import pe.buildshield.ordering.application.OrdersCommandService;
 import pe.buildshield.ordering.shared.security.JwtTokenIssuer;
 import pe.buildshield.ordering.shared.tenant.TenantContext;
 import pe.buildshield.ordering.shared.tenant.TenantInfo;
@@ -47,7 +47,7 @@ class OrderingIsolationIntegrationTest {
     ObjectMapper json;
 
     @Autowired
-    OrderCommandService orderCommands;
+    OrdersCommandService orderCommands;
 
     private final UUID andina = UUID.randomUUID();
     private final UUID otra = UUID.randomUUID();
