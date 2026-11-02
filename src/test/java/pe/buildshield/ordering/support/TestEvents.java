@@ -77,6 +77,26 @@ public final class TestEvents {
         return envelope(json, UUID.randomUUID(), eventType, organizationId, "ASSIGNMENT", assignmentId, payload);
     }
 
+    /** Evento de una devolución de saldos, como lo publica inventory ({@code MaterialReturnChanged}). */
+    public static String materialReturn(ObjectMapper json, UUID eventId, String eventType, UUID organizationId,
+            UUID returnId, UUID worksiteId, UUID warehouseId, String status, UUID materialId, BigDecimal quantity) {
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("materialId", materialId);
+        line.put("quantity", quantity);
+        line.put("acceptedQty", null);
+        line.put("rejectedQty", null);
+        line.put("rejectionReason", null);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("returnId", returnId);
+        payload.put("worksiteId", worksiteId);
+        payload.put("warehouseId", warehouseId);
+        payload.put("status", status);
+        payload.put("reason", null);
+        payload.put("hasRejections", false);
+        payload.put("lines", List.of(line));
+        return envelope(json, eventId, eventType, organizationId, "MATERIAL_RETURN", returnId, payload);
+    }
+
     public static String stockReserved(ObjectMapper json, UUID eventId, UUID organizationId, UUID orderId,
             UUID warehouseId, List<Map<String, Object>> reservations) {
         Map<String, Object> payload = new LinkedHashMap<>();

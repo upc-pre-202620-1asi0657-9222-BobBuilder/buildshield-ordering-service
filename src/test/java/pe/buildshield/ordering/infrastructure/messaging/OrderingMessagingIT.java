@@ -14,14 +14,19 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import pe.buildshield.ordering.application.DispatchCommandService;
+import pe.buildshield.ordering.application.DispatchQueryService;
 import pe.buildshield.ordering.application.DispatchView;
 import pe.buildshield.ordering.application.OrdersCommandService;
 import pe.buildshield.ordering.application.OrdersQueryService;
 import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionView;
+import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
+import pe.buildshield.ordering.domain.model.dispatch.DispatchStatus;
+import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.dispatch.IncidentType;
 import pe.buildshield.ordering.domain.model.order.OrderStatus;
+import pe.buildshield.ordering.shared.error.ConflictException;
 import pe.buildshield.ordering.shared.messaging.Topics;
 import pe.buildshield.ordering.shared.tenant.TenantContext;
 import pe.buildshield.ordering.shared.tenant.TenantInfo;
@@ -39,6 +44,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 /**
@@ -59,6 +65,9 @@ class OrderingMessagingIT {
 
     @Autowired
     DispatchCommandService dispatchCommands;
+
+    @Autowired
+    DispatchQueryService dispatchQueries;
 
     @Autowired
     ReceptionCommandService receptionCommands;
@@ -224,6 +233,7 @@ class OrderingMessagingIT {
         assertThat(partial.at("/payload/partialCount").asInt()).isEqualTo(1);
         assertThat(partial.at("/payload/lines")).singleElement().satisfies(line -> {
             assertThat(line.path("receptionLineId").asText()).isEqualTo(cementLine.toString());
+            assertThat(line.path("dispatchLineId").isTextual()).isTrue();
             assertThat(line.path("receivedQuantity").decimalValue()).isEqualByComparingTo("20");
             assertThat(line.path("deltaQuantity").decimalValue()).isEqualByComparingTo("20");
         });
@@ -236,9 +246,12 @@ class OrderingMessagingIT {
         payload.fieldNames().forEachRemaining(fields::add);
         // jsonb no conserva el orden de las claves: se comparan los nombres.
         assertThat(fields).containsExactlyInAnyOrder("receptionId", "dispatchId", "orderId", "manifestCode", "worksiteId",
-                "warehouseId", "confirmedBy", "confirmedAt", "lines");
+                "worksiteName", "warehouseId", "warehouseName", "returnDispatch", "confirmedBy", "confirmedAt", "lines");
         assertThat(payload.path("worksiteId").asText()).isEqualTo(torre.toString());
+        assertThat(payload.path("worksiteName").asText()).isEqualTo("Torre Norte");
         assertThat(payload.path("warehouseId").asText()).isEqualTo(central.toString());
+        assertThat(payload.path("warehouseName").asText()).isEqualTo("Almacén Central");
+        assertThat(payload.path("returnDispatch").asBoolean()).isFalse();
         assertThat(payload.path("confirmedBy").asText()).isEqualTo(jorge.userId().toString());
         for (JsonNode line : payload.path("lines")) {
             List<String> lineFields = new ArrayList<>();
@@ -321,6 +334,95 @@ class OrderingMessagingIT {
         assertThat(TenantContext.callAs(new TenantInfo(otherOrg, user, "SITE_MANAGER"),
                 () -> jdbc.queryForObject("SELECT count(*) FROM assignment_projection WHERE user_id = ?",
                         Long.class, user))).isZero();
+    }
+
+    @Test
+    void a_return_opens_and_closes_its_dispatch_through_kafka_without_touching_orders() throws Exception {
+        UUID returnId = UUID.randomUUID();
+        UUID dispatchId = Dispatch.returnDispatchId(returnId);
+        UUID dispatchedEvent = UUID.randomUUID();
+        String dispatched = TestEvents.materialReturn(json, dispatchedEvent, "MaterialReturnDispatched", org, returnId,
+                torre, central, "IN_TRANSIT", cement, new BigDecimal("12.500"));
+
+        kafka.send(Topics.INVENTORY, returnId.toString(), dispatched);
+        await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM dispatches WHERE id = ?", dispatchId) == 1);
+
+        // El mismo evento otra vez y otro evento de la misma devolución: sigue siendo un solo despacho.
+        UUID secondEvent = UUID.randomUUID();
+        kafka.send(Topics.INVENTORY, returnId.toString(), dispatched);
+        kafka.send(Topics.INVENTORY, returnId.toString(), TestEvents.materialReturn(json, secondEvent,
+                "MaterialReturnDispatched", org, returnId, torre, central, "IN_TRANSIT", cement,
+                new BigDecimal("12.500")));
+        await().atMost(TIMEOUT).until(() -> processed(secondEvent));
+        assertThat(count("SELECT count(*) FROM dispatches WHERE id = ?", dispatchId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM dispatch_lines WHERE dispatch_id = ?", dispatchId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM outbox_events WHERE aggregate_id = ? AND event_type = "
+                + "'ReturnDispatchCreated'", dispatchId)).isEqualTo(1);
+
+        DispatchView view = as(rosa, () -> dispatchQueries.get(dispatchId));
+        assertThat(view.type()).isEqualTo(DispatchType.RETURN);
+        assertThat(view.status()).isEqualTo(DispatchStatus.IN_TRANSIT);
+        assertThat(view.orderId()).isNull();
+        assertThat(view.warehouseId()).isEqualTo(central);
+        assertThat(view.worksiteId()).isEqualTo(torre);
+        assertThat(view.departedAt()).isNotNull();
+        assertThat(view.receivedAt()).isNull();
+        assertThat(view.manifestCode()).startsWith("MAN-");
+        assertThat(view.lines()).singleElement().satisfies(line -> {
+            assertThat(line.orderLineId()).isNull();
+            assertThat(line.materialId()).isEqualTo(cement);
+            assertThat(line.quantity()).isEqualByComparingTo("12.5");
+        });
+        assertThat(as(jorge, () -> dispatchQueries.list(null, DispatchStatus.IN_TRANSIT)))
+                .extracting(DispatchView::id).containsExactly(dispatchId);
+        assertThat(as(jorge, () -> dispatchQueries.manifest(dispatchId)).qrContent()).isEqualTo(view.manifestCode());
+        assertThatThrownBy(() -> as(jorge, () -> receptionCommands.start(dispatchId, null)))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("retorno");
+
+        publisher.publish();
+        JsonNode created = readOrderingTopic(envelope -> "ReturnDispatchCreated".equals(
+                envelope.path("eventType").asText()), 1).get(0);
+        assertThat(created.path("aggregateId").asText()).isEqualTo(dispatchId.toString());
+        assertThat(created.path("payload").path("returnId").asText()).isEqualTo(returnId.toString());
+        assertThat(created.path("payload").path("dispatchId").asText()).isEqualTo(dispatchId.toString());
+        assertThat(created.path("payload").path("worksiteName").asText()).isEqualTo("Torre Norte");
+        assertThat(created.path("payload").path("warehouseName").asText()).isEqualTo("Almacén Central");
+
+        UUID receivedEvent = UUID.randomUUID();
+        kafka.send(Topics.INVENTORY, returnId.toString(), TestEvents.materialReturn(json, receivedEvent,
+                "MaterialReturnReceived", org, returnId, torre, central, "RECEIVED", cement, new BigDecimal("12.500")));
+        await().atMost(TIMEOUT).until(() -> processed(receivedEvent));
+
+        DispatchView closed = as(rosa, () -> dispatchQueries.get(dispatchId));
+        assertThat(closed.status()).isEqualTo(DispatchStatus.RECEIVED);
+        assertThat(closed.receivedAt()).isNotNull();
+        assertThat(count("SELECT count(*) FROM receptions WHERE dispatch_id = ?", dispatchId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM orders WHERE organization_id = ?", Long.class, org)).isZero();
+        assertThat(jdbc.queryForList("SELECT event_type FROM outbox_events WHERE aggregate_id = ?", String.class,
+                dispatchId)).containsExactlyInAnyOrder("ReturnDispatchCreated", "ReturnDispatchClosed");
+        publisher.publish();
+        JsonNode closedEvent = readOrderingTopic(envelope -> "ReturnDispatchClosed".equals(
+                envelope.path("eventType").asText()), 1).get(0);
+        assertThat(closedEvent.path("payload").path("returnId").asText()).isEqualTo(returnId.toString());
+        assertThat(closedEvent.path("payload").path("status").asText()).isEqualTo("RECEIVED");
+    }
+
+    @Test
+    void a_cancelled_or_rejected_return_creates_no_dispatch_and_a_stray_reception_changes_nothing() {
+        UUID returnId = UUID.randomUUID();
+        UUID lastEvent = UUID.randomUUID();
+        kafka.send(Topics.INVENTORY, returnId.toString(), TestEvents.materialReturn(json, UUID.randomUUID(),
+                "MaterialReturnCancelled", org, returnId, torre, central, "CANCELLED", cement, BigDecimal.TEN));
+        kafka.send(Topics.INVENTORY, returnId.toString(), TestEvents.materialReturn(json, UUID.randomUUID(),
+                "MaterialReturnRejected", org, returnId, torre, central, "REJECTED", cement, BigDecimal.TEN));
+        kafka.send(Topics.INVENTORY, returnId.toString(), TestEvents.materialReturn(json, lastEvent,
+                "MaterialReturnReceived", org, returnId, torre, central, "RECEIVED", cement, BigDecimal.TEN));
+        await().atMost(TIMEOUT).until(() -> processed(lastEvent));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM dispatches WHERE organization_id = ?", Long.class, org))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM outbox_events WHERE organization_id = ?", Long.class, org))
+                .isZero();
     }
 
     private boolean processed(UUID eventId) {

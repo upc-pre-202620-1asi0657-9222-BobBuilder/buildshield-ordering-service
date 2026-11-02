@@ -66,4 +66,10 @@ class JpaDispatchRepository implements DispatchRepository {
         entity.apply(dispatch);
         return jpa.saveAndFlush(entity).toDomain();
     }
+
+    @Override
+    @Transactional
+    public Dispatch add(Dispatch dispatch) {
+        return jpa.saveAndFlush(new DispatchJpaEntity(dispatch)).toDomain();
+    }
 }

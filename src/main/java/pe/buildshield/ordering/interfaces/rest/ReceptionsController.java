@@ -67,7 +67,8 @@ class ReceptionsController {
             + "(INVALID_RECEPTION_REQUEST)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "404", description = "El despacho no existe o no va a una obra del usuario",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    @ApiResponse(responseCode = "409", description = "Ya existe la recepción (RECEPTION_ALREADY_EXISTS) o el despacho "
+    @ApiResponse(responseCode = "409", description = "Es un despacho de retorno, que recibe inventario "
+            + "(RETURN_DISPATCH_NOT_RECEIVABLE), ya existe la recepción (RECEPTION_ALREADY_EXISTS) o el despacho "
             + "no está en tránsito (DISPATCH_NOT_IN_TRANSIT)",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     ResponseEntity<ReceptionResource> start(@Valid @RequestBody StartReceptionRequest request) {

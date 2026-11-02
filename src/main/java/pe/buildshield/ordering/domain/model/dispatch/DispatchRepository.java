@@ -23,4 +23,7 @@ public interface DispatchRepository {
     List<Dispatch> findByOrderId(UUID orderId);
 
     Dispatch save(Dispatch dispatch);
+
+    /** Guarda un despacho nuevo que ya trae su identificador (despacho de retorno). */
+    Dispatch add(Dispatch dispatch);
 }

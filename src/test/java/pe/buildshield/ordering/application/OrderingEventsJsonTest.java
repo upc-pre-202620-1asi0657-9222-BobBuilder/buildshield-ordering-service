@@ -61,7 +61,7 @@ class OrderingEventsJsonTest extends ServiceTestBase {
         assertFields("DispatchDepartureWeighed", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "grossKg", "tareKg", "netKg", "ticketPhotoUrl");
         assertFields("DispatchDeparted", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
-                "departedAt", "lines");
+                "departedAt", "returnDispatch", "lines");
         assertLineFields("DispatchDeparted", "dispatchLineId", "orderLineId", "materialId", "quantity");
         assertFields("DispatchCancelled", "dispatchId", "orderId", "manifestCode", "warehouseId", "warehouseName", "worksiteId", "worksiteName",
                 "reason", "cancelledAt");
@@ -73,11 +73,11 @@ class OrderingEventsJsonTest extends ServiceTestBase {
                 "worksiteId", "worksiteName", "grossKg", "tareKg", "netKg", "departureNetKg", "differenceKg", "differencePercent",
                 "tolerancePercent", "withinTolerance");
         assertFields("ReceptionPartiallyReceived", "receptionId", "dispatchId", "orderId", "manifestCode",
-                "warehouseId", "warehouseName", "worksiteId", "worksiteName", "partialCount", "lines");
+                "warehouseId", "warehouseName", "worksiteId", "worksiteName", "returnDispatch", "partialCount", "lines");
         assertLineFields("ReceptionPartiallyReceived", "receptionLineId", "dispatchLineId", "orderLineId", "materialId",
                 "receivedQuantity", "deltaQuantity");
         assertFields("ReceptionConfirmed", "receptionId", "dispatchId", "orderId", "manifestCode", "worksiteId", "worksiteName",
-                "warehouseId", "warehouseName", "confirmedBy", "confirmedAt", "lines");
+                "warehouseId", "warehouseName", "returnDispatch", "confirmedBy", "confirmedAt", "lines");
         assertLineFields("ReceptionConfirmed", "receptionLineId", "dispatchLineId", "orderLineId", "materialId", "sku",
                 "materialName", "unit", "requested", "dispatched", "received", "deltaQuantity", "shrinkagePercent",
                 "tolerancePercent", "withinTolerance");

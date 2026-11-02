@@ -1,5 +1,7 @@
 package pe.buildshield.ordering.application;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -9,6 +11,7 @@ import pe.buildshield.ordering.domain.model.dispatch.DepartureWeighing;
 import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchLine;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchRepository;
+import pe.buildshield.ordering.domain.model.dispatch.DispatchStatus;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.dispatch.IncidentType;
 import pe.buildshield.ordering.domain.model.dispatch.ManifestCode;
@@ -37,6 +40,10 @@ import java.util.random.RandomGenerator;
  * transportista, salida del almacén, US25 anulación y US32 incidencias en ruta. El pedido es del mismo contexto: se
  * actualiza en la misma transacción. El stock lo mueve inventario al consumir {@code DispatchDeparted}.
  *
+ * <p>Los despachos de retorno (US43) no tienen endpoint para crearlos: nacen y se cierran con los eventos de la
+ * devolución de inventario. No tocan pedidos, no abren recepción y no publican {@code DispatchDeparted} ni
+ * {@code ReceptionConfirmed}: el stock de la devolución lo mueve solo inventario.
+ *
  * <p>Quién: preparan, completan, despachan, anulan y registran incidencias el administrador o un encargado de
  * almacén asignado al almacén de origen. Para el resto el despacho (o el pedido) no existe: 404.
  */
@@ -44,6 +51,8 @@ import java.util.random.RandomGenerator;
 public class DispatchCommandService {
 
     public static final String ORDER_NOT_DISPATCHABLE = "ORDER_NOT_DISPATCHABLE";
+
+    private static final Logger log = LoggerFactory.getLogger(DispatchCommandService.class);
 
     private final DispatchRepository dispatches;
     private final TransitIncidentRepository incidents;
@@ -190,6 +199,51 @@ public class DispatchCommandService {
         return IncidentView.of(incident);
     }
 
+    /**
+     * {@code MaterialReturnDispatched}: la devolución salió de la obra y nace su despacho de retorno, en tránsito.
+     * Publica {@code ReturnDispatchCreated}. Si la devolución ya tiene despacho no hace nada.
+     */
+    @Transactional
+    public void openReturnDispatch(OpenReturnDispatch command) {
+        UUID dispatchId = Dispatch.returnDispatchId(command.returnId());
+        if (dispatches.findById(dispatchId).isPresent()) {
+            log.info("La devolución {} ya tiene su despacho de retorno {}", command.returnId(), dispatchId);
+            return;
+        }
+        Instant now = clock.instant();
+        List<DispatchLine> lines = command.lines().stream()
+                .map(line -> DispatchLine.ofReturn(line.materialId(), line.quantity())).toList();
+        Dispatch saved = dispatches.add(Dispatch.forReturn(command.returnId(), command.warehouseId(),
+                command.worksiteId(), ManifestCode.generate(now, random), lines,
+                command.departedAt() == null ? now : command.departedAt(), now));
+        outbox.append(OrderingEvents.RETURN_DISPATCH_CREATED, OrderingEvents.DISPATCH, saved.id(),
+                OrderingEvents.ReturnDispatchCreated.of(command.returnId(), saved, names(saved)));
+    }
+
+    /**
+     * {@code MaterialReturnReceived}: inventario recibió la devolución y su despacho de retorno queda Recibido, sin
+     * recepción. Publica {@code ReturnDispatchClosed}. Se ignora si ya estaba cerrado, o si no existe (devolución que
+     * salió antes de que existieran estos despachos).
+     */
+    @Transactional
+    public void closeReturnDispatch(UUID returnId) {
+        UUID dispatchId = Dispatch.returnDispatchId(returnId);
+        Dispatch dispatch = dispatches.findById(dispatchId).orElse(null);
+        if (dispatch == null) {
+            log.warn("La devolución {} se recibió sin despacho de retorno", returnId);
+            return;
+        }
+        if (dispatch.status() == DispatchStatus.RECEIVED) {
+            log.info("El despacho de retorno {} ya estaba cerrado", dispatchId);
+            return;
+        }
+        Instant now = clock.instant();
+        dispatch.markReceived(now);
+        Dispatch saved = dispatches.save(dispatch);
+        outbox.append(OrderingEvents.RETURN_DISPATCH_CLOSED, OrderingEvents.DISPATCH, saved.id(),
+                OrderingEvents.ReturnDispatchClosed.of(returnId, saved, now, names(saved)));
+    }
+
     private OrganizationDirectory.SiteNames names(Dispatch dispatch) {
         return directory.siteNames(dispatch.worksiteId(), dispatch.warehouseId());
     }
@@ -219,5 +273,13 @@ public class DispatchCommandService {
     }
 
     public record LineRequest(UUID orderLineId, BigDecimal quantity) {
+    }
+
+    /** Lo que trae {@code MaterialReturnDispatched}. */
+    public record OpenReturnDispatch(UUID returnId, UUID worksiteId, UUID warehouseId, Instant departedAt,
+            List<ReturnLine> lines) {
+    }
+
+    public record ReturnLine(UUID materialId, BigDecimal quantity) {
     }
 }

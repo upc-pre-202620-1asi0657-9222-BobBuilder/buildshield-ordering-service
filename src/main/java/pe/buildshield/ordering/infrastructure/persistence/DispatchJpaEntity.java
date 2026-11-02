@@ -26,7 +26,9 @@ import java.util.UUID;
 /**
  * Tabla dispatches con sus líneas y su pesaje de salida (a lo más uno: la tabla departure_weighings tiene
  * {@code dispatch_id} único). Las colecciones se cargan por lotes para que listar despachos no haga una consulta por
- * despacho. La preparación es {@code created_at} y la recepción se lee de {@code receptions.confirmed_at}.
+ * despacho. La preparación es {@code created_at} y la recepción se lee de {@code receptions.confirmed_at}. Un despacho
+ * de retorno no tiene recepción: se cierra una sola vez y no cambia después, así que su {@code updated_at} es la hora
+ * del cierre.
  */
 @Entity
 @Table(name = "dispatches")
@@ -65,7 +67,8 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
     @Column(name = "departed_at")
     private Instant departedAt;
 
-    @Formula("(SELECT r.confirmed_at FROM receptions r WHERE r.dispatch_id = id)")
+    @Formula("COALESCE((SELECT r.confirmed_at FROM receptions r WHERE r.dispatch_id = id), "
+            + "CASE WHEN type = 'RETURN' AND status = 'RECEIVED' THEN updated_at END)")
     private Instant receivedAt;
 
     @Column(name = "cancelled_at")
@@ -91,6 +94,9 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
     }
 
     DispatchJpaEntity(Dispatch dispatch) {
+        if (dispatch.id() != null) {
+            assignId(dispatch.id());
+        }
         orderId = dispatch.orderId();
         warehouseId = dispatch.warehouseId();
         worksiteId = dispatch.worksiteId();

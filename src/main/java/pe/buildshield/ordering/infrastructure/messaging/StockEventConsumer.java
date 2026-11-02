@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import pe.buildshield.ordering.application.DispatchCommandService;
 import pe.buildshield.ordering.application.OrdersCommandService;
 import pe.buildshield.ordering.infrastructure.persistence.JdbcOrganizationProjections;
 import pe.buildshield.ordering.shared.messaging.EventEnvelope;
@@ -14,6 +15,8 @@ import pe.buildshield.ordering.shared.tenant.TenantContext;
 import pe.buildshield.ordering.shared.tenant.TenantInfo;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -24,7 +27,14 @@ import java.util.UUID;
  *   <li>{@code StockReserved}: el pedido pasa de Aprobando a EnRevision.</li>
  *   <li>{@code StockReservationRejected}: el pedido vuelve a Registrado con {@code rejectionReason} = {@code reason}.</li>
  * </ul>
- * Si el pedido ya no está Aprobando el evento se ignora (se registra en el log).
+ * Si el pedido ya no está Aprobando el evento se ignora (se registra en el log). Del mismo tópico, las devoluciones de
+ * saldos (US43):
+ * <ul>
+ *   <li>{@code MaterialReturnDispatched}: crea el despacho de retorno, en tránsito, y publica
+ *       {@code ReturnDispatchCreated}.</li>
+ *   <li>{@code MaterialReturnReceived}: cierra el despacho de retorno y publica {@code ReturnDispatchClosed}.</li>
+ * </ul>
+ * Una devolución anulada o rechazada no llega a {@code MaterialReturnDispatched}, así que no crea nada.
  *
  * <p>Tópico {@code buildshield.organization}, copias locales:
  * <ul>
@@ -43,6 +53,8 @@ public class StockEventConsumer {
     static final String CONSUMER = "StockEventConsumer";
     static final String STOCK_RESERVED = "StockReserved";
     static final String STOCK_RESERVATION_REJECTED = "StockReservationRejected";
+    static final String MATERIAL_RETURN_DISPATCHED = "MaterialReturnDispatched";
+    static final String MATERIAL_RETURN_RECEIVED = "MaterialReturnReceived";
     static final String LOCATION_REGISTERED = "LocationRegistered";
     static final String LOCATION_UPDATED = "LocationUpdated";
     static final String MATERIAL_REGISTERED = "MaterialRegistered";
@@ -54,12 +66,14 @@ public class StockEventConsumer {
 
     private final IdempotentEventProcessor processor;
     private final OrdersCommandService orders;
+    private final DispatchCommandService dispatches;
     private final JdbcOrganizationProjections projections;
 
     public StockEventConsumer(IdempotentEventProcessor processor, OrdersCommandService orders,
-            JdbcOrganizationProjections projections) {
+            DispatchCommandService dispatches, JdbcOrganizationProjections projections) {
         this.processor = processor;
         this.orders = orders;
+        this.dispatches = dispatches;
         this.projections = projections;
     }
 
@@ -83,6 +97,8 @@ public class StockEventConsumer {
         switch (event.eventType()) {
             case STOCK_RESERVED -> orders.confirmReservation(orderId(event));
             case STOCK_RESERVATION_REJECTED -> orders.rejectReservation(orderId(event), text(payload, "reason"));
+            case MATERIAL_RETURN_DISPATCHED -> dispatches.openReturnDispatch(openReturn(event));
+            case MATERIAL_RETURN_RECEIVED -> dispatches.closeReturnDispatch(uuid(payload, "returnId"));
             default -> log.debug("Evento {} ignorado por ordering", event.eventType());
         }
     }
@@ -106,6 +122,17 @@ public class StockEventConsumer {
                     uuid(payload, "assignmentId"));
             default -> log.debug("Evento {} ignorado por ordering", event.eventType());
         }
+    }
+
+    private static DispatchCommandService.OpenReturnDispatch openReturn(EventEnvelope event) {
+        JsonNode payload = event.payload();
+        List<DispatchCommandService.ReturnLine> lines = new ArrayList<>();
+        for (JsonNode line : payload.path("lines")) {
+            lines.add(new DispatchCommandService.ReturnLine(uuid(line, "materialId"),
+                    new BigDecimal(line.path("quantity").asText())));
+        }
+        return new DispatchCommandService.OpenReturnDispatch(uuid(payload, "returnId"), uuid(payload, "worksiteId"),
+                uuid(payload, "warehouseId"), event.occurredAt(), lines);
     }
 
     private static UUID orderId(EventEnvelope event) {

@@ -5,6 +5,7 @@ import pe.buildshield.ordering.shared.error.ErrorDetail;
 import pe.buildshield.ordering.shared.error.ValidationException;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,7 +24,11 @@ import java.util.UUID;
  *
  * <p>Para salir (Preparado → EnTransito) necesita transportista (US30) y pesaje de salida (US27); ambos
  * solo se registran mientras está Preparado. Mientras está Preparado se puede anular con motivo (US25); en
- * tránsito se registran incidencias (US32). Un despacho de retorno no tiene pedido.
+ * tránsito se registran incidencias (US32).
+ *
+ * <p>Un despacho de retorno (US43) no tiene pedido y no se prepara aquí: nace en tránsito cuando inventario inicia la
+ * devolución de un saldo y se cierra cuando inventario la recibe. Su identificador se deriva de la devolución
+ * ({@link #returnDispatchId}), así una devolución no puede tener dos despachos: la llave primaria lo impide.
  */
 public class Dispatch {
 
@@ -80,6 +85,27 @@ public class Dispatch {
                 new DispatchState.Prepared(), null, null, null, null, null, null);
     }
 
+    /** Identificador del despacho de retorno de una devolución: siempre el mismo para la misma devolución. */
+    public static UUID returnDispatchId(UUID returnId) {
+        Objects.requireNonNull(returnId, "returnId");
+        return UUID.nameUUIDFromBytes(("balance-return:" + returnId).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Despacho de retorno de una devolución que ya salió de la obra: sin pedido, sin transportista ni pesaje (los datos
+     * de la devolución viven en inventario) y en tránsito desde el inicio.
+     *
+     * @param warehouseId almacén que recibe
+     * @param worksiteId  obra que devuelve
+     */
+    public static Dispatch forReturn(UUID returnId, UUID warehouseId, UUID worksiteId, ManifestCode manifestCode,
+            List<DispatchLine> lines, Instant departedAt, Instant now) {
+        requireLines(lines);
+        return new Dispatch(returnDispatchId(returnId), null, warehouseId, worksiteId, DispatchType.RETURN, manifestCode,
+                lines, now, new DispatchState.InTransit(), null, null, Objects.requireNonNull(departedAt, "departedAt"),
+                null, null, null);
+    }
+
     public static Dispatch restore(UUID id, UUID orderId, UUID warehouseId, UUID worksiteId, DispatchType type,
             ManifestCode manifestCode, List<DispatchLine> lines, Instant preparedAt, DispatchStatus status,
             Carrier carrier, DepartureWeighing departureWeighing, Instant departedAt, Instant receivedAt,
@@ -97,7 +123,7 @@ public class Dispatch {
         }
         Set<UUID> orderLines = new HashSet<>();
         for (DispatchLine line : lines) {
-            if (!orderLines.add(line.orderLineId())) {
+            if (line.orderLineId() != null && !orderLines.add(line.orderLineId())) {
                 throw new ValidationException("DUPLICATE_ORDER_LINE",
                         "La línea de pedido " + line.orderLineId() + " aparece más de una vez en el despacho",
                         List.of(new ErrorDetail("lines", "línea repetida: " + line.orderLineId())));

@@ -4,6 +4,7 @@ import pe.buildshield.ordering.application.OrganizationDirectory.SiteNames;
 import pe.buildshield.ordering.domain.model.dispatch.Carrier;
 import pe.buildshield.ordering.domain.model.dispatch.DepartureWeighing;
 import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
+import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.dispatch.TransitIncident;
 import pe.buildshield.ordering.domain.model.order.Order;
 import pe.buildshield.ordering.domain.model.reception.ArrivalWeighing;
@@ -33,6 +34,8 @@ public final class OrderingEvents {
     public static final String DISPATCH_DEPARTED = "DispatchDeparted";
     public static final String DISPATCH_CANCELLED = "DispatchCancelled";
     public static final String TRANSIT_INCIDENT_REPORTED = "TransitIncidentReported";
+    public static final String RETURN_DISPATCH_CREATED = "ReturnDispatchCreated";
+    public static final String RETURN_DISPATCH_CLOSED = "ReturnDispatchClosed";
     public static final String RECEPTION_OPENED = "ReceptionOpened";
     public static final String ARRIVAL_WEIGHED = "ArrivalWeighed";
     public static final String RECEPTION_PARTIALLY_RECEIVED = "ReceptionPartiallyReceived";
@@ -134,12 +137,14 @@ public final class OrderingEvents {
 
     public record DispatchDeparted(UUID dispatchId, UUID orderId, String manifestCode, UUID warehouseId,
             String warehouseName,
-            UUID worksiteId, String worksiteName, Instant departedAt, List<DispatchLinePayload> lines) {
+            UUID worksiteId, String worksiteName, Instant departedAt, boolean returnDispatch,
+            List<DispatchLinePayload> lines) {
 
         public static DispatchDeparted of(Dispatch dispatch, SiteNames names) {
             return new DispatchDeparted(dispatch.id(), dispatch.orderId(), dispatch.manifestCode().value(),
                     dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
-                    dispatch.departedAt(), dispatchLines(dispatch));
+                    dispatch.departedAt(),
+                    dispatch.type() == DispatchType.RETURN, dispatchLines(dispatch));
         }
     }
 
@@ -166,6 +171,33 @@ public final class OrderingEvents {
                     dispatch.worksiteId(), names.worksiteName(),
                     incident.type().name(), incident.type().label(), incident.observation(), incident.photoUrl(),
                     incident.reportedAt());
+        }
+    }
+
+    /**
+     * Despacho de retorno creado para una devolución de inventario: en tránsito, sin pedido y con
+     * {@code orderLineId} nulo en cada línea. Inventario guarda {@code dispatchId} en la devolución; el stock ya lo movió
+     * inventario y este evento no lo mueve.
+     */
+    public record ReturnDispatchCreated(UUID returnId, UUID dispatchId, String manifestCode, UUID warehouseId,
+            String warehouseName, UUID worksiteId, String worksiteName, String status, Instant departedAt,
+            List<DispatchLinePayload> lines) {
+
+        public static ReturnDispatchCreated of(UUID returnId, Dispatch dispatch, SiteNames names) {
+            return new ReturnDispatchCreated(returnId, dispatch.id(), dispatch.manifestCode().value(),
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    dispatch.status().name(), dispatch.departedAt(), dispatchLines(dispatch));
+        }
+    }
+
+    /** Inventario recibió la devolución y el despacho de retorno quedó Recibido. No mueve stock. */
+    public record ReturnDispatchClosed(UUID returnId, UUID dispatchId, String manifestCode, UUID warehouseId,
+            String warehouseName, UUID worksiteId, String worksiteName, String status, Instant receivedAt) {
+
+        public static ReturnDispatchClosed of(UUID returnId, Dispatch dispatch, Instant receivedAt, SiteNames names) {
+            return new ReturnDispatchClosed(returnId, dispatch.id(), dispatch.manifestCode().value(),
+                    dispatch.warehouseId(), names.warehouseName(), dispatch.worksiteId(), names.worksiteName(),
+                    dispatch.status().name(), receivedAt);
         }
     }
 
@@ -210,14 +242,16 @@ public final class OrderingEvents {
 
     /** Solo las líneas con diferencia mayor que cero. */
     public record ReceptionPartiallyReceived(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName, int partialCount,
+            UUID warehouseId, String warehouseName, UUID worksiteId, String worksiteName, boolean returnDispatch,
+            int partialCount,
             List<PartialLinePayload> lines) {
 
         public static ReceptionPartiallyReceived of(Reception reception, List<Reception.LineDelta> deltas,
                 SiteNames names) {
             return new ReceptionPartiallyReceived(reception.id(), reception.dispatchId(), reception.orderId(),
                     reception.manifestCode(), reception.warehouseId(), names.warehouseName(), reception.worksiteId(),
-                    names.worksiteName(), reception.partialCount(),
+                    names.worksiteName(),
+                    reception.orderId() == null, reception.partialCount(),
                     deltas.stream().map(delta -> new PartialLinePayload(delta.line().id(),
                     delta.line().dispatchLineId(),
                             delta.line().orderLineId(),
@@ -237,7 +271,8 @@ public final class OrderingEvents {
     }
 
     public record ReceptionConfirmed(UUID receptionId, UUID dispatchId, UUID orderId, String manifestCode,
-            UUID worksiteId, String worksiteName, UUID warehouseId, String warehouseName, UUID confirmedBy,
+            UUID worksiteId, String worksiteName, UUID warehouseId, String warehouseName, boolean returnDispatch,
+            UUID confirmedBy,
             Instant confirmedAt,
             List<ConfirmedLinePayload> lines) {
     }

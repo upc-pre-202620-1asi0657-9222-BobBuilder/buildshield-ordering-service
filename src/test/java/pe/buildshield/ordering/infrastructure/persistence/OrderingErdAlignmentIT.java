@@ -15,6 +15,7 @@ import pe.buildshield.ordering.application.OrderView;
 import pe.buildshield.ordering.application.ReceptionCommandService;
 import pe.buildshield.ordering.application.ReceptionQueryService;
 import pe.buildshield.ordering.application.ReceptionView;
+import pe.buildshield.ordering.shared.error.ConflictException;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchStatus;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.reception.ReceptionStatus;
@@ -41,6 +42,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * El esquema coincide con el ERD ampliado por el equipo y lo que salió de las tablas se sigue respondiendo igual:
@@ -258,7 +260,7 @@ class OrderingErdAlignmentIT {
     }
 
     @Test
-    void a_return_dispatch_has_no_order_and_can_be_received() {
+    void a_return_dispatch_has_no_order_and_opens_no_reception() {
         UUID dispatch = UUID.randomUUID();
         UUID line = UUID.randomUUID();
         Timestamp now = Timestamp.from(Instant.now());
@@ -278,14 +280,8 @@ class OrderingErdAlignmentIT {
         assertThat(view.lines().get(0).orderLineId()).isNull();
         assertThat(as(rosa, () -> dispatchQueries.list(UUID.randomUUID(), null))).isEmpty();
 
-        ReceptionView reception = as(jorge, () -> receptionCommands.start(dispatch, null));
-        assertThat(reception.orderId()).isNull();
-        as(jorge, () -> receptionCommands.recordLine(reception.id(), reception.lines().get(0).id(), new BigDecimal("2")));
-        assertThat(as(jorge, () -> receptionCommands.receivePartial(reception.id())).partialCount()).isEqualTo(1);
-        assertThat(as(jorge, () -> receptionQueries.comparison(reception.id())).lines().get(0).requested()).isNull();
-        as(jorge, () -> receptionCommands.recordLine(reception.id(), reception.lines().get(0).id(), new BigDecimal("5")));
-        as(jorge, () -> receptionCommands.confirm(reception.id()));
-        assertThat(as(rosa, () -> dispatchQueries.get(dispatch)).status()).isEqualTo(DispatchStatus.RECEIVED);
+        assertThatThrownBy(() -> as(jorge, () -> receptionCommands.start(dispatch, null)))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("retorno");
     }
 
     @Test

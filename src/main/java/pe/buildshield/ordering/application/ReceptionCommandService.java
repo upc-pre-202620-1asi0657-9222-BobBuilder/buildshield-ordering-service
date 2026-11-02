@@ -9,6 +9,7 @@ import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchLine;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchRepository;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchStatus;
+import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.order.Order;
 import pe.buildshield.ordering.domain.model.order.OrderLine;
 import pe.buildshield.ordering.domain.model.order.OrderRepository;
@@ -38,6 +39,8 @@ import java.util.UUID;
  * del mismo contexto y se actualizan en la misma transacción; el stock de la obra lo suma inventario al consumir
  * {@code ReceptionPartiallyReceived} y {@code ReceptionConfirmed} (solo {@code deltaQuantity}).
  *
+ * <p>Un despacho de retorno no abre recepción: lo recibe inventario y ordering solo lo cierra.
+ *
  * <p>Quién: abren, registran y confirman el administrador o un encargado de obra asignado a la obra de destino. Para
  * el resto la recepción (o el despacho) no existe: 404.
  */
@@ -47,6 +50,7 @@ public class ReceptionCommandService {
     public static final String RECEPTION_ALREADY_EXISTS = "RECEPTION_ALREADY_EXISTS";
     public static final String DISPATCH_NOT_IN_TRANSIT = "DISPATCH_NOT_IN_TRANSIT";
     public static final String INVALID_RECEPTION_REQUEST = "INVALID_RECEPTION_REQUEST";
+    public static final String RETURN_DISPATCH_NOT_RECEIVABLE = "RETURN_DISPATCH_NOT_RECEIVABLE";
 
     private final ReceptionRepository receptions;
     private final DispatchRepository dispatches;
@@ -87,6 +91,10 @@ public class ReceptionCommandService {
                 : dispatches.findById(dispatchId);
         Dispatch dispatch = found.filter(candidate -> access.canWorkWorksite(candidate.worksiteId()))
                 .orElseThrow(() -> OrderingErrors.dispatchNotFound(byCode ? manifestCode : dispatchId));
+        if (dispatch.type() == DispatchType.RETURN) {
+            throw new ConflictException(RETURN_DISPATCH_NOT_RECEIVABLE,
+                    "Un despacho de retorno no se recibe aquí: el almacén verifica la devolución en inventario");
+        }
         receptions.findIdByDispatchId(dispatch.id()).ifPresent(existing -> {
             throw alreadyExists(existing);
         });
@@ -241,7 +249,8 @@ public class ReceptionCommandService {
         OrganizationDirectory.SiteNames names = names(reception);
         return new OrderingEvents.ReceptionConfirmed(reception.id(), reception.dispatchId(), reception.orderId(),
                 reception.manifestCode(), reception.worksiteId(), names.worksiteName(), reception.warehouseId(),
-                names.warehouseName(), reception.confirmedBy(), reception.confirmedAt(), lines);
+                names.warehouseName(), reception.orderId() == null, reception.confirmedBy(),
+                reception.confirmedAt(), lines);
     }
 
     /**

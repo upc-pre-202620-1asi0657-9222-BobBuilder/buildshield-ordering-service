@@ -26,6 +26,11 @@ public record DispatchLine(UUID id, UUID orderLineId, UUID materialId, BigDecima
         quantity = quantity.setScale(SCALE, RoundingMode.UNNECESSARY);
     }
 
+    /** Línea de un despacho de retorno, sin línea de pedido. */
+    public static DispatchLine ofReturn(UUID materialId, BigDecimal quantity) {
+        return new DispatchLine(null, null, materialId, quantity);
+    }
+
     /** Línea nueva; el identificador lo asigna la persistencia. */
     public static DispatchLine of(UUID orderLineId, UUID materialId, BigDecimal quantity) {
         return new DispatchLine(null, Objects.requireNonNull(orderLineId, "orderLineId"), materialId, quantity);

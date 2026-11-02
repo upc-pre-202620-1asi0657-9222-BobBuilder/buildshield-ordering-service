@@ -60,6 +60,11 @@ public abstract class AuditableAbstractAggregateRoot<A extends AuditableAbstract
     @Transient
     private final transient List<Object> domainEvents = new ArrayList<>();
 
+    /** Para un agregado nuevo cuyo identificador no es aleatorio. */
+    protected void assignId(UUID newId) {
+        id = newId;
+    }
+
     public UUID getId() {
         return id;
     }

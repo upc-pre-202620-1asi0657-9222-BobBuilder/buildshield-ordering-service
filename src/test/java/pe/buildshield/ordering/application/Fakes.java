@@ -104,7 +104,7 @@ final class Fakes {
 
         @Override
         public List<Dispatch> findByOrderId(UUID orderId) {
-            return stored.values().stream().filter(dispatch -> dispatch.orderId().equals(orderId)).toList();
+            return stored.values().stream().filter(dispatch -> orderId.equals(dispatch.orderId())).toList();
         }
 
         @Override
@@ -112,6 +112,11 @@ final class Fakes {
             Dispatch copy = copy(dispatch, dispatch.version() == null ? 0L : dispatch.version() + 1);
             stored.put(copy.id(), copy);
             return copy;
+        }
+
+        @Override
+        public Dispatch add(Dispatch dispatch) {
+            return save(dispatch);
         }
 
         private static Dispatch copy(Dispatch dispatch, Long version) {
