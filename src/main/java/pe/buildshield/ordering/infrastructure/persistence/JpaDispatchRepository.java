@@ -36,7 +36,7 @@ class JpaDispatchRepository implements DispatchRepository {
 
     @Override
     public List<Dispatch> findAll() {
-        return jpa.findAllByOrderByPreparedAtDesc().stream().map(DispatchJpaEntity::toDomain).toList();
+        return jpa.findAllByOrderByCreatedAtDesc().stream().map(DispatchJpaEntity::toDomain).toList();
     }
 
     @Override
@@ -49,7 +49,7 @@ class JpaDispatchRepository implements DispatchRepository {
 
     @Override
     public List<Dispatch> findByOrderId(UUID orderId) {
-        return jpa.findByOrderIdOrderByPreparedAtAsc(orderId).stream().map(DispatchJpaEntity::toDomain).toList();
+        return jpa.findByOrderIdOrderByCreatedAtAsc(orderId).stream().map(DispatchJpaEntity::toDomain).toList();
     }
 
     @Override

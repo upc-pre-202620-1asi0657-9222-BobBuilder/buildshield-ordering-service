@@ -23,7 +23,7 @@ import java.util.UUID;
  *
  * <p>Para salir (Preparado → EnTransito) necesita transportista (US30) y pesaje de salida (US27); ambos
  * solo se registran mientras está Preparado. Mientras está Preparado se puede anular con motivo (US25); en
- * tránsito se registran incidencias (US32).
+ * tránsito se registran incidencias (US32). Un despacho de retorno no tiene pedido.
  */
 public class Dispatch {
 
@@ -55,7 +55,7 @@ public class Dispatch {
             DepartureWeighing departureWeighing, Instant departedAt, Instant receivedAt, Cancellation cancellation,
             Long version) {
         this.id = id;
-        this.orderId = Objects.requireNonNull(orderId, "orderId");
+        this.orderId = orderId;
         this.warehouseId = Objects.requireNonNull(warehouseId, "warehouseId");
         this.worksiteId = Objects.requireNonNull(worksiteId, "worksiteId");
         this.type = Objects.requireNonNull(type, "type");
@@ -75,7 +75,8 @@ public class Dispatch {
     public static Dispatch prepare(UUID orderId, UUID warehouseId, UUID worksiteId, DispatchType type,
             ManifestCode manifestCode, List<DispatchLine> lines, Instant now) {
         requireLines(lines);
-        return new Dispatch(null, orderId, warehouseId, worksiteId, type, manifestCode, lines, now,
+        return new Dispatch(null, Objects.requireNonNull(orderId, "orderId"), warehouseId, worksiteId, type, manifestCode,
+                lines, now,
                 new DispatchState.Prepared(), null, null, null, null, null, null);
     }
 
@@ -163,7 +164,8 @@ public class Dispatch {
     /** Cantidad de cada línea de pedido que lleva el despacho. */
     public Map<UUID, BigDecimal> quantitiesByOrderLine() {
         Map<UUID, BigDecimal> quantities = new LinkedHashMap<>();
-        lines.forEach(line -> quantities.merge(line.orderLineId(), line.quantity(), BigDecimal::add));
+        lines.stream().filter(line -> line.orderLineId() != null)
+                .forEach(line -> quantities.merge(line.orderLineId(), line.quantity(), BigDecimal::add));
         return quantities;
     }
 

@@ -10,12 +10,12 @@ import java.util.UUID;
 
 interface SpringDataDispatchRepository extends JpaRepository<DispatchJpaEntity, UUID> {
 
-    List<DispatchJpaEntity> findAllByOrderByPreparedAtDesc();
+    List<DispatchJpaEntity> findAllByOrderByCreatedAtDesc();
 
     Optional<DispatchJpaEntity> findByManifestCode(String manifestCode);
 
-    List<DispatchJpaEntity> findByOrderIdOrderByPreparedAtAsc(UUID orderId);
+    List<DispatchJpaEntity> findByOrderIdOrderByCreatedAtAsc(UUID orderId);
 
-    @Query("SELECT d FROM DispatchJpaEntity d WHERE d.warehouseId IN :sites OR d.worksiteId IN :sites ORDER BY d.preparedAt DESC")
+    @Query("SELECT d FROM DispatchJpaEntity d WHERE d.warehouseId IN :sites OR d.worksiteId IN :sites ORDER BY d.createdAt DESC")
     List<DispatchJpaEntity> findBySites(Collection<UUID> sites);
 }

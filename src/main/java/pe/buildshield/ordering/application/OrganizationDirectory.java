@@ -6,8 +6,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Puerto de lectura de las copias locales de organization (obras, almacenes, materiales y asignaciones), que
@@ -43,15 +41,10 @@ public interface OrganizationDirectory {
     /**
      * Obra o almacén.
      *
-     * @param type WORKSITE o WAREHOUSE
+     * @param type    WORKSITE o WAREHOUSE
+     * @param address la que muestra el manifiesto (en una obra incluye distrito y ciudad)
      */
-    record Location(UUID id, String type, String name, String address, String district, String city, boolean active) {
-
-        /** Dirección, distrito y ciudad unidos con coma (los vacíos se omiten), como el manifiesto del Core. */
-        public String fullAddress() {
-            return Stream.of(address, district, city).filter(part -> part != null && !part.isBlank())
-                    .collect(Collectors.joining(", "));
-        }
+    record Location(UUID id, String type, String name, String address, boolean active) {
     }
 
     /** Material del catálogo con su tolerancia de merma en %. */

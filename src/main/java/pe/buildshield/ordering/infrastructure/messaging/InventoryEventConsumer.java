@@ -28,6 +28,7 @@ import java.util.UUID;
 @Component
 public class InventoryEventConsumer {
 
+    static final String CONSUMER = "InventoryEventConsumer";
     static final String STOCK_RESERVED = "StockReserved";
     static final String STOCK_RESERVATION_REJECTED = "StockReservationRejected";
 
@@ -48,7 +49,7 @@ public class InventoryEventConsumer {
         EventEnvelope envelope = processor.parse(record.value());
         TenantContext.runAs(new TenantInfo(envelope.organizationId(),
                 envelope.actorId() == null ? TenantContext.SYSTEM_USER_ID : envelope.actorId(),
-                IdempotentEventProcessor.SYSTEM_ROLE), () -> processor.process(record, this::handle));
+                IdempotentEventProcessor.SYSTEM_ROLE), () -> processor.process(CONSUMER, record, this::handle));
     }
 
     void handle(EventEnvelope event) {

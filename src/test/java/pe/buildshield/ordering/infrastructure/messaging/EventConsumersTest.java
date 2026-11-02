@@ -59,9 +59,9 @@ class EventConsumersTest {
         Map<String, Object> payload = Map.of("assignmentId", assignment.toString(), "userId", user.toString(),
                 "locationId", location.toString(), "locationType", "WORKSITE");
         organization.handle(event("StaffAssigned", assignment, payload));
-        verify(projections).upsertAssignment(ORG, assignment, user, location, "WORKSITE", true);
+        verify(projections).upsertAssignment(ORG, assignment, user, location, "WORKSITE");
         organization.handle(event("StaffUnassigned", assignment, payload));
-        verify(projections).upsertAssignment(ORG, assignment, user, location, "WORKSITE", false);
+        verify(projections).removeAssignment(ORG, assignment);
     }
 
     @Test
@@ -94,6 +94,6 @@ class EventConsumersTest {
         org.mockito.Mockito.when(processor.parse("{}")).thenReturn(event("StockReserved", UUID.randomUUID(), Map.of()));
         organization.onMessage(record);
         inventory.onMessage(record);
-        verify(processor, org.mockito.Mockito.times(2)).process(eq(record), any());
+        verify(processor, org.mockito.Mockito.times(2)).process(any(), eq(record), any());
     }
 }

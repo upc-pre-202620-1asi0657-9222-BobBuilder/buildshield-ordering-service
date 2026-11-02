@@ -16,7 +16,7 @@ import java.util.UUID;
  * Recepción en obra de un despacho en tránsito (US35, US37). Hay una sola por despacho. Lo recibido de
  * cada línea se registra de a poco (EnCurso); una recepción parcial (US38) ingresa al stock lo recibido hasta
  * ahora (RecibidaParcialmente) y la conformidad la cierra (Confirmada): después ya no cambia (QAS10). Admite un
- * pesaje de llegada (US29) mientras no está confirmada.
+ * pesaje de llegada (US29) mientras no está confirmada. Si recibe un despacho de retorno, no tiene pedido.
  */
 public class Reception {
 
@@ -46,7 +46,7 @@ public class Reception {
             Instant confirmedAt, ArrivalWeighing arrivalWeighing, Long version) {
         this.id = id;
         this.dispatchId = Objects.requireNonNull(dispatchId, "dispatchId");
-        this.orderId = Objects.requireNonNull(orderId, "orderId");
+        this.orderId = orderId;
         this.warehouseId = Objects.requireNonNull(warehouseId, "warehouseId");
         this.worksiteId = Objects.requireNonNull(worksiteId, "worksiteId");
         this.manifestCode = Objects.requireNonNull(manifestCode, "manifestCode");

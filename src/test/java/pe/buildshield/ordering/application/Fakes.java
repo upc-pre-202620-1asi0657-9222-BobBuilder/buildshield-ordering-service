@@ -199,13 +199,13 @@ final class Fakes {
 
         UUID worksite(String name) {
             UUID id = UUID.randomUUID();
-            locations.put(id, new Location(id, WORKSITE, name, "Av. Principal 100", "Miraflores", "Lima", true));
+            locations.put(id, new Location(id, WORKSITE, name, "Av. Principal 100, Miraflores, Lima", true));
             return id;
         }
 
         UUID warehouse(String name, boolean active) {
             UUID id = UUID.randomUUID();
-            locations.put(id, new Location(id, WAREHOUSE, name, "Av. Argentina 2500, Callao", null, null, active));
+            locations.put(id, new Location(id, WAREHOUSE, name, "Av. Argentina 2500, Callao", active));
             return id;
         }
 

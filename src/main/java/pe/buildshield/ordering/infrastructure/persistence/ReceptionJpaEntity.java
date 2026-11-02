@@ -5,7 +5,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.BatchSize;
@@ -14,33 +16,25 @@ import pe.buildshield.ordering.domain.model.reception.ReceptionLine;
 import pe.buildshield.ordering.domain.model.reception.ReceptionStatus;
 import pe.buildshield.ordering.shared.persistence.AuditableAbstractAggregateRoot;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Tabla receptions con sus líneas (reception_lines) y su pesaje de llegada (arrival_weighings, a lo más uno: la
- * tabla tiene {@code reception_id} único).
+ * tabla tiene {@code reception_id} único). El pedido, la obra, el almacén y el manifiesto se leen del despacho.
+ * {@code partial_count} y {@code last_partial_at} no están en el ERD ni se pueden derivar (DESVIACIONES.md).
  */
 @Entity
 @Table(name = "receptions")
 public class ReceptionJpaEntity extends AuditableAbstractAggregateRoot<ReceptionJpaEntity> {
 
-    @Column(name = "dispatch_id", nullable = false, updatable = false)
-    private UUID dispatchId;
-
-    @Column(name = "order_id", nullable = false, updatable = false)
-    private UUID orderId;
-
-    @Column(name = "warehouse_id", nullable = false, updatable = false)
-    private UUID warehouseId;
-
-    @Column(name = "worksite_id", nullable = false, updatable = false)
-    private UUID worksiteId;
-
-    @Column(name = "manifest_code", nullable = false, length = 30, updatable = false)
-    private String manifestCode;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "dispatch_id", nullable = false, updatable = false)
+    private DispatchJpaEntity dispatch;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -70,13 +64,15 @@ public class ReceptionJpaEntity extends AuditableAbstractAggregateRoot<Reception
     protected ReceptionJpaEntity() {
     }
 
-    ReceptionJpaEntity(Reception reception) {
-        dispatchId = reception.dispatchId();
-        orderId = reception.orderId();
-        warehouseId = reception.warehouseId();
-        worksiteId = reception.worksiteId();
-        manifestCode = reception.manifestCode();
-        reception.lines().forEach(line -> lines.add(new ReceptionLineJpaEntity(line)));
+    /**
+     * @param dispatch      el despacho que se recibe
+     * @param dispatchLines busca cada línea del despacho por su id
+     */
+    ReceptionJpaEntity(Reception reception, DispatchJpaEntity dispatch,
+            Function<UUID, DispatchLineJpaEntity> dispatchLines) {
+        this.dispatch = dispatch;
+        reception.lines().forEach(line -> lines.add(
+                new ReceptionLineJpaEntity(line, dispatchLines.apply(line.dispatchLineId()))));
         status = reception.status();
         partialCount = reception.partialCount();
     }
@@ -96,10 +92,22 @@ public class ReceptionJpaEntity extends AuditableAbstractAggregateRoot<Reception
         }
     }
 
-    Reception toDomain() {
+    boolean hasArrivalWeighing() {
+        return !weighings.isEmpty();
+    }
+
+    List<UUID> materialIds() {
+        return lines.stream().map(ReceptionLineJpaEntity::materialId).toList();
+    }
+
+    /** @param tolerancePercent menor tolerancia de los materiales del despacho; solo se usa si hay pesaje de llegada */
+    Reception toDomain(BigDecimal tolerancePercent) {
         List<ReceptionLine> domainLines = lines.stream().map(ReceptionLineJpaEntity::toDomain).toList();
-        return Reception.restore(getId(), dispatchId, orderId, warehouseId, worksiteId, manifestCode, domainLines,
-                status, partialCount, lastPartialAt, confirmedBy, confirmedAt,
-                weighings.stream().findFirst().map(ArrivalWeighingJpaEntity::toDomain).orElse(null), getVersion());
+        return Reception.restore(getId(), dispatch.getId(), dispatch.orderId(), dispatch.warehouseId(),
+                dispatch.worksiteId(), dispatch.manifestCode(), domainLines, status, partialCount, lastPartialAt,
+                confirmedBy, confirmedAt,
+                weighings.stream().findFirst()
+                        .map(weighing -> weighing.toDomain(dispatch.departureNetKg(), tolerancePercent)).orElse(null),
+                getVersion());
     }
 }

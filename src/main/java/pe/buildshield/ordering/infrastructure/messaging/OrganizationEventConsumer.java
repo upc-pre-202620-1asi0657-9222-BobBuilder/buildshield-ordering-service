@@ -21,7 +21,7 @@ import java.util.UUID;
  *   <li>{@code MaterialRegistered} y {@code MaterialUpdated}: {@code material_projection} (SKU, unidad y
  *       tolerancia).</li>
  *   <li>{@code StaffAssigned} y {@code StaffUnassigned}: {@code assignment_projection} (qué obras y almacenes ve cada
- *       encargado; la desasignación la desactiva).</li>
+ *       encargado; la desasignación borra la fila).</li>
  * </ul>
  *
  * Cada evento se procesa una sola vez ({@link IdempotentEventProcessor}). Los demás tipos se ignoran.
@@ -29,6 +29,7 @@ import java.util.UUID;
 @Component
 public class OrganizationEventConsumer {
 
+    static final String CONSUMER = "OrganizationEventConsumer";
     static final String LOCATION_REGISTERED = "LocationRegistered";
     static final String LOCATION_UPDATED = "LocationUpdated";
     static final String MATERIAL_REGISTERED = "MaterialRegistered";
@@ -48,7 +49,7 @@ public class OrganizationEventConsumer {
 
     @KafkaListener(topics = "${buildshield.messaging.consumes.organization:buildshield.organization}")
     public void onMessage(ConsumerRecord<String, String> record) {
-        processor.process(record, this::handle);
+        processor.process(CONSUMER, record, this::handle);
     }
 
     void handle(EventEnvelope event) {
@@ -63,9 +64,11 @@ public class OrganizationEventConsumer {
                     payload.hasNonNull("tolerancePercent") ? payload.get("tolerancePercent").decimalValue()
                             : BigDecimal.ZERO,
                     payload.path("active").asBoolean(true));
-            case STAFF_ASSIGNED, STAFF_UNASSIGNED -> projections.upsertAssignment(event.organizationId(),
+            case STAFF_ASSIGNED -> projections.upsertAssignment(event.organizationId(),
                     uuid(payload, "assignmentId"), uuid(payload, "userId"), uuid(payload, "locationId"),
-                    payload.path("locationType").asText(), STAFF_ASSIGNED.equals(event.eventType()));
+                    payload.path("locationType").asText());
+            case STAFF_UNASSIGNED -> projections.removeAssignment(event.organizationId(),
+                    uuid(payload, "assignmentId"));
             default -> log.debug("Evento {} ignorado por ordering", event.eventType());
         }
     }

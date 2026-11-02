@@ -133,10 +133,12 @@ public class ReceptionCommandService {
     public ReceptionView receivePartial(UUID receptionId) {
         Reception reception = workable(receptionId);
         List<Reception.LineDelta> deltas = reception.receivePartial(clock.instant());
+        Order order = orderOf(reception);
         Reception saved = receptions.save(reception);
-        Order order = orders.findById(saved.orderId()).orElseThrow(() -> OrderingErrors.orderNotFound(saved.orderId()));
-        order.registerReceived(receivedByOrderLine(deltas));
-        orders.save(order);
+        if (order != null) {
+            order.registerReceived(receivedByOrderLine(deltas));
+            orders.save(order);
+        }
         outbox.append(OrderingEvents.RECEPTION_PARTIALLY_RECEIVED, OrderingEvents.RECEPTION, saved.id(),
                 OrderingEvents.ReceptionPartiallyReceived.of(saved, deltas));
         return ReceptionView.of(saved);
@@ -154,10 +156,10 @@ public class ReceptionCommandService {
         Reception reception = workable(receptionId);
         Instant now = clock.instant();
         List<Reception.LineDelta> deltas = reception.confirm(access.requester().userId(), now);
+        Order order = orderOf(reception);
         Reception saved = receptions.save(reception);
 
-        Order order = orders.findById(saved.orderId()).orElseThrow(() -> OrderingErrors.orderNotFound(saved.orderId()));
-        Map<UUID, BigDecimal> received = receivedByOrderLine(deltas);
+        Map<UUID, BigDecimal> received = order == null ? Map.of() : receivedByOrderLine(deltas);
         if (!received.isEmpty()) {
             order.registerReceived(received);
         }
@@ -165,7 +167,8 @@ public class ReceptionCommandService {
                 .orElseThrow(() -> OrderingErrors.dispatchNotFound(saved.dispatchId()));
         dispatch.markReceived(now);
         dispatches.save(dispatch);
-        boolean closing = order.status() == OrderStatus.FULFILLED && dispatches.findByOrderId(order.id()).stream()
+        boolean closing = order != null && order.status() == OrderStatus.FULFILLED
+                && dispatches.findByOrderId(order.id()).stream()
                 .filter(other -> other.status() != DispatchStatus.CANCELLED)
                 .allMatch(other -> other.id().equals(dispatch.id()) || other.status() == DispatchStatus.RECEIVED);
         if (closing) {
@@ -223,18 +226,32 @@ public class ReceptionCommandService {
         List<OrderingEvents.ConfirmedLinePayload> lines = deltas.stream().map(delta -> {
             ReceptionLine line = delta.line();
             Material material = materials.get(line.materialId());
-            OrderLine orderLine = order.lineById(line.orderLineId());
+            OrderLine orderLine = order == null ? null : order.lineById(line.orderLineId());
+            String fallbackSku = orderLine == null ? null : orderLine.sku();
             BigDecimal tolerance = material == null ? BigDecimal.ZERO : material.tolerancePercent();
             return new OrderingEvents.ConfirmedLinePayload(line.id(), line.dispatchLineId(), line.orderLineId(),
-                    line.materialId(), material == null ? orderLine.sku() : material.sku(),
-                    material == null ? orderLine.sku() : material.name(),
-                    material == null ? orderLine.unit() : material.unit(), orderLine.requested(), line.dispatchedQty(),
+                    line.materialId(), material == null ? fallbackSku : material.sku(),
+                    material == null ? fallbackSku : material.name(),
+                    material != null ? material.unit() : orderLine == null ? null : orderLine.unit(),
+                    orderLine == null ? null : orderLine.requested(), line.dispatchedQty(),
                     line.receivedQty(), delta.delta(), line.shrinkagePercent(), tolerance,
                     Shrinkage.withinTolerance(line.shrinkagePercent(), tolerance));
         }).toList();
         return new OrderingEvents.ReceptionConfirmed(reception.id(), reception.dispatchId(), reception.orderId(),
                 reception.manifestCode(), reception.worksiteId(), reception.warehouseId(), reception.confirmedBy(),
                 reception.confirmedAt(), lines);
+    }
+
+    /**
+     * El pedido de la recepción, o {@code null} en un despacho de retorno. Se lee antes de guardar la recepción: lo
+     * recibido de cada línea del pedido se suma de las líneas de recepción, y la diferencia se agrega aparte.
+     */
+    private Order orderOf(Reception reception) {
+        if (reception.orderId() == null) {
+            return null;
+        }
+        return orders.findById(reception.orderId())
+                .orElseThrow(() -> OrderingErrors.orderNotFound(reception.orderId()));
     }
 
     private static Map<UUID, BigDecimal> receivedByOrderLine(List<Reception.LineDelta> deltas) {

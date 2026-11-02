@@ -301,13 +301,14 @@ class OrderingMessagingIT {
                 assignment, user, worksite, "WORKSITE"));
 
         await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM assignment_projection WHERE assignment_id = ? "
-                + "AND active", assignment) == 1);
+                + "", assignment) == 1);
         await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM location_projection WHERE location_id = ? "
                 + "AND name = 'Torre Sur II' AND NOT active", worksite) == 1);
-        assertThat(jdbc.queryForMap("SELECT organization_id, type, district, city FROM location_projection "
+        assertThat(jdbc.queryForMap("SELECT organization_id, type, address FROM location_projection "
                 + "WHERE location_id = ?", worksite))
-                .containsEntry("organization_id", otherOrg).containsEntry("type", "WORKSITE")
-                .containsEntry("district", "Miraflores").containsEntry("city", "Lima");
+                .containsEntry("organization_id", otherOrg).containsEntry("type", "WORKSITE");
+        assertThat(jdbc.queryForObject("SELECT address FROM location_projection WHERE location_id = ?", String.class,
+                worksite)).endsWith("Miraflores, Lima");
         await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM material_projection WHERE material_id = ?",
                 material) == 1);
         assertThat(jdbc.queryForObject("SELECT tolerance_percent FROM material_projection WHERE material_id = ?",
@@ -315,10 +316,10 @@ class OrderingMessagingIT {
 
         kafka.send(Topics.ORGANIZATION, assignment.toString(), TestEvents.assignment(json, "StaffUnassigned", otherOrg,
                 assignment, user, worksite, "WORKSITE"));
-        await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM assignment_projection WHERE assignment_id = ? "
-                + "AND NOT active", assignment) == 1);
+        await().atMost(TIMEOUT).until(() -> count("SELECT count(*) FROM assignment_projection WHERE assignment_id = ?",
+                assignment) == 0);
         assertThat(TenantContext.callAs(new TenantInfo(otherOrg, user, "SITE_MANAGER"),
-                () -> jdbc.queryForObject("SELECT count(*) FROM assignment_projection WHERE user_id = ? AND active",
+                () -> jdbc.queryForObject("SELECT count(*) FROM assignment_projection WHERE user_id = ?",
                         Long.class, user))).isZero();
     }
 

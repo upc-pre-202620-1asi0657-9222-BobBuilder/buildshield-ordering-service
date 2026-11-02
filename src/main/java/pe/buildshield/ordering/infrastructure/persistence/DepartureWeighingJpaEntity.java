@@ -11,10 +11,15 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Tabla departure_weighings: un pesaje de salida por despacho; no se modifica. */
+/**
+ * Tabla departure_weighings: un pesaje de salida por despacho; no se modifica. La foto es obligatoria en la tabla y
+ * opcional en la API: un pesaje sin foto guarda {@value #NO_TICKET_PHOTO}, que el dominio ve como nulo.
+ */
 @Entity
 @Table(name = "departure_weighings")
 public class DepartureWeighingJpaEntity extends OrganizationScopedEntity {
+
+    static final String NO_TICKET_PHOTO = "sin-foto";
 
     @Id
     private UUID id;
@@ -28,7 +33,7 @@ public class DepartureWeighingJpaEntity extends OrganizationScopedEntity {
     @Column(name = "net_kg", nullable = false, precision = 12, scale = 3, updatable = false)
     private BigDecimal netKg;
 
-    @Column(name = "ticket_photo_url", length = 500, updatable = false)
+    @Column(name = "ticket_photo_url", nullable = false, length = 500, updatable = false)
     private String ticketPhotoUrl;
 
     @Column(name = "weighed_at", nullable = false, updatable = false)
@@ -45,12 +50,17 @@ public class DepartureWeighingJpaEntity extends OrganizationScopedEntity {
         grossKg = weighing.grossKg();
         tareKg = weighing.tareKg();
         netKg = weighing.netKg();
-        ticketPhotoUrl = weighing.ticketPhotoUrl();
+        ticketPhotoUrl = weighing.ticketPhotoUrl() == null ? NO_TICKET_PHOTO : weighing.ticketPhotoUrl();
         weighedAt = weighing.weighedAt();
         weighedBy = weighing.weighedBy();
     }
 
+    BigDecimal netKg() {
+        return netKg;
+    }
+
     DepartureWeighing toDomain() {
-        return new DepartureWeighing(grossKg, tareKg, netKg, ticketPhotoUrl, weighedAt, weighedBy);
+        return new DepartureWeighing(grossKg, tareKg, netKg, NO_TICKET_PHOTO.equals(ticketPhotoUrl) ? null : ticketPhotoUrl,
+                weighedAt, weighedBy);
     }
 }

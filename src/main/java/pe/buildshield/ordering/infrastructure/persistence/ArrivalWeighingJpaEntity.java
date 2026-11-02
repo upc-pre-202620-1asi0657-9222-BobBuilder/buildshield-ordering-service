@@ -11,7 +11,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Tabla arrival_weighings: un pesaje de llegada por recepción (US29); no se modifica. */
+/**
+ * Tabla arrival_weighings: un pesaje de llegada por recepción (US29); no se modifica. El neto de salida se lee del
+ * pesaje de salida del despacho y la tolerancia, de la copia local de los materiales.
+ */
 @Entity
 @Table(name = "arrival_weighings")
 public class ArrivalWeighingJpaEntity extends OrganizationScopedEntity {
@@ -27,12 +30,6 @@ public class ArrivalWeighingJpaEntity extends OrganizationScopedEntity {
 
     @Column(name = "net_kg", nullable = false, precision = 12, scale = 3, updatable = false)
     private BigDecimal netKg;
-
-    @Column(name = "departure_net_kg", precision = 12, scale = 3, updatable = false)
-    private BigDecimal departureNetKg;
-
-    @Column(name = "tolerance_pct", nullable = false, precision = 5, scale = 2, updatable = false)
-    private BigDecimal tolerancePct;
 
     @Column(name = "ticket_photo_url", length = 500, updatable = false)
     private String ticketPhotoUrl;
@@ -51,15 +48,13 @@ public class ArrivalWeighingJpaEntity extends OrganizationScopedEntity {
         grossKg = weighing.grossKg();
         tareKg = weighing.tareKg();
         netKg = weighing.netKg();
-        departureNetKg = weighing.departureNetKg();
-        tolerancePct = weighing.tolerancePercent();
         ticketPhotoUrl = weighing.ticketPhotoUrl();
         weighedAt = weighing.weighedAt();
         weighedBy = weighing.weighedBy();
     }
 
-    ArrivalWeighing toDomain() {
-        return new ArrivalWeighing(grossKg, tareKg, netKg, departureNetKg, tolerancePct, ticketPhotoUrl, weighedAt,
+    ArrivalWeighing toDomain(BigDecimal departureNetKg, BigDecimal tolerancePercent) {
+        return new ArrivalWeighing(grossKg, tareKg, netKg, departureNetKg, tolerancePercent, ticketPhotoUrl, weighedAt,
                 weighedBy);
     }
 }

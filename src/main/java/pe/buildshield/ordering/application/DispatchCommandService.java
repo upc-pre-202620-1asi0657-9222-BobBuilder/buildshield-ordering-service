@@ -159,10 +159,12 @@ public class DispatchCommandService {
     public DispatchView cancel(UUID dispatchId, String reason) {
         Dispatch dispatch = manageable(dispatchId);
         dispatch.cancel(access.requester().userId(), reason, clock.instant());
-        Order order = orders.findById(dispatch.orderId())
-                .orElseThrow(() -> OrderingErrors.orderNotFound(dispatch.orderId()));
-        order.revertDispatch(dispatch.quantitiesByOrderLine());
-        orders.save(order);
+        if (dispatch.orderId() != null) {
+            Order order = orders.findById(dispatch.orderId())
+                    .orElseThrow(() -> OrderingErrors.orderNotFound(dispatch.orderId()));
+            order.revertDispatch(dispatch.quantitiesByOrderLine());
+            orders.save(order);
+        }
         Dispatch saved = dispatches.save(dispatch);
         outbox.append(OrderingEvents.DISPATCH_CANCELLED, OrderingEvents.DISPATCH, saved.id(),
                 OrderingEvents.DispatchCancelled.of(saved));

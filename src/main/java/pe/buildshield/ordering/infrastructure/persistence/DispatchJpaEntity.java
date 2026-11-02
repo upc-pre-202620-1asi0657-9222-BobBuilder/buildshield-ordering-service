@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.Formula;
 import pe.buildshield.ordering.domain.model.dispatch.Carrier;
 import pe.buildshield.ordering.domain.model.dispatch.Dispatch;
 import pe.buildshield.ordering.domain.model.dispatch.DispatchStatus;
@@ -16,6 +17,7 @@ import pe.buildshield.ordering.domain.model.dispatch.DispatchType;
 import pe.buildshield.ordering.domain.model.dispatch.ManifestCode;
 import pe.buildshield.ordering.shared.persistence.AuditableAbstractAggregateRoot;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,13 +26,14 @@ import java.util.UUID;
 /**
  * Tabla dispatches con sus líneas y su pesaje de salida (a lo más uno: la tabla departure_weighings tiene
  * {@code dispatch_id} único). Las colecciones se cargan por lotes para que listar despachos no haga una consulta por
- * despacho.
+ * despacho. La preparación es {@code created_at} y la recepción se lee de {@code receptions.confirmed_at}.
  */
 @Entity
 @Table(name = "dispatches")
 public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJpaEntity> {
 
-    @Column(name = "order_id", nullable = false, updatable = false)
+    /** Nulo en un despacho de retorno. */
+    @Column(name = "order_id", updatable = false)
     private UUID orderId;
 
     @Column(name = "warehouse_id", nullable = false, updatable = false)
@@ -44,10 +47,10 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
     private DispatchType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 15)
+    @Column(name = "status", nullable = false, length = 25)
     private DispatchStatus status;
 
-    @Column(name = "manifest_code", nullable = false, length = 30, updatable = false)
+    @Column(name = "manifest_code", nullable = false, length = 40, updatable = false)
     private String manifestCode;
 
     @Column(name = "carrier_name", length = 150)
@@ -59,13 +62,10 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
     @Column(name = "plate", length = 10)
     private String plate;
 
-    @Column(name = "prepared_at", nullable = false, updatable = false)
-    private Instant preparedAt;
-
     @Column(name = "departed_at")
     private Instant departedAt;
 
-    @Column(name = "received_at")
+    @Formula("(SELECT r.confirmed_at FROM receptions r WHERE r.dispatch_id = id)")
     private Instant receivedAt;
 
     @Column(name = "cancelled_at")
@@ -96,7 +96,6 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
         worksiteId = dispatch.worksiteId();
         type = dispatch.type();
         manifestCode = dispatch.manifestCode().value();
-        preparedAt = dispatch.preparedAt();
         dispatch.lines().forEach(line -> lines.add(new DispatchLineJpaEntity(line)));
         apply(dispatch);
     }
@@ -109,7 +108,6 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
         carrierDocument = carrier == null ? null : carrier.document();
         plate = carrier == null ? null : carrier.plate();
         departedAt = dispatch.departedAt();
-        receivedAt = dispatch.receivedAt();
         Dispatch.Cancellation cancellation = dispatch.cancellation().orElse(null);
         cancelledAt = cancellation == null ? null : cancellation.at();
         cancelledBy = cancellation == null ? null : cancellation.by();
@@ -119,12 +117,33 @@ public class DispatchJpaEntity extends AuditableAbstractAggregateRoot<DispatchJp
         }
     }
 
+    public UUID orderId() {
+        return orderId;
+    }
+
+    public UUID warehouseId() {
+        return warehouseId;
+    }
+
+    public UUID worksiteId() {
+        return worksiteId;
+    }
+
+    public String manifestCode() {
+        return manifestCode;
+    }
+
+    /** Neto del pesaje de salida; nulo si no lo tiene. */
+    public BigDecimal departureNetKg() {
+        return weighings.stream().findFirst().map(DepartureWeighingJpaEntity::netKg).orElse(null);
+    }
+
     Dispatch toDomain() {
         Carrier carrier = carrierName == null ? null : new Carrier(carrierName, carrierDocument, plate);
         Dispatch.Cancellation cancellation = cancelledAt == null ? null
                 : new Dispatch.Cancellation(cancelledAt, cancelledBy, cancellationReason);
         return Dispatch.restore(getId(), orderId, warehouseId, worksiteId, type, new ManifestCode(manifestCode),
-                lines.stream().map(DispatchLineJpaEntity::toDomain).toList(), preparedAt, status, carrier,
+                lines.stream().map(DispatchLineJpaEntity::toDomain).toList(), getCreatedAt(), status, carrier,
                 weighings.stream().findFirst().map(DepartureWeighingJpaEntity::toDomain).orElse(null), departedAt,
                 receivedAt, cancellation, getVersion());
     }

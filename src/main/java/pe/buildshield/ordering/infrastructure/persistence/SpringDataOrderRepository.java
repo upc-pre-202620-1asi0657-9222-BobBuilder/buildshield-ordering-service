@@ -9,8 +9,8 @@ import java.util.UUID;
 
 interface SpringDataOrderRepository extends JpaRepository<OrderJpaEntity, UUID> {
 
-    List<OrderJpaEntity> findAllByOrderByPlacedAtDesc();
+    List<OrderJpaEntity> findAllByOrderByCreatedAtDesc();
 
-    @Query("SELECT o FROM OrderJpaEntity o WHERE o.worksiteId IN :sites OR o.warehouseId IN :sites ORDER BY o.placedAt DESC")
+    @Query("SELECT o FROM OrderJpaEntity o WHERE o.worksiteId IN :sites OR o.warehouseId IN :sites ORDER BY o.createdAt DESC")
     List<OrderJpaEntity> findBySites(Collection<UUID> sites);
 }

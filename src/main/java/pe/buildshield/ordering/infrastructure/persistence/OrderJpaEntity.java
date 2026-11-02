@@ -7,18 +7,21 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.BatchSize;
+import pe.buildshield.ordering.application.OrganizationDirectory.Material;
 import pe.buildshield.ordering.domain.model.order.Order;
 import pe.buildshield.ordering.domain.model.order.OrderLine;
 import pe.buildshield.ordering.domain.model.order.OrderStatus;
 import pe.buildshield.ordering.shared.persistence.AuditableAbstractAggregateRoot;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Tabla orders con sus líneas (order_lines). */
@@ -32,20 +35,14 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
     @Column(name = "warehouse_id", nullable = false, updatable = false)
     private UUID warehouseId;
 
-    @Column(name = "requested_by", nullable = false, updatable = false)
-    private UUID requestedBy;
-
     @Column(name = "notes", length = 500, updatable = false)
     private String notes;
 
-    @Column(name = "required_date", updatable = false)
+    @Column(name = "required_date", nullable = false, updatable = false)
     private LocalDate requiredDate;
 
-    @Column(name = "placed_at", nullable = false, updatable = false)
-    private Instant placedAt;
-
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
+    @Column(name = "status", nullable = false, length = 25)
     private OrderStatus status;
 
     @Column(name = "rejection_reason", length = 500)
@@ -59,7 +56,6 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "order_id", nullable = false, updatable = false)
-    @OrderBy("sku")
     @BatchSize(size = 50)
     private List<OrderLineJpaEntity> lines = new ArrayList<>();
 
@@ -69,10 +65,8 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
     OrderJpaEntity(Order order) {
         worksiteId = order.worksiteId();
         warehouseId = order.warehouseId();
-        requestedBy = order.requestedBy();
         notes = order.notes();
         requiredDate = order.requiredDate();
-        placedAt = order.placedAt();
         order.lines().forEach(line -> lines.add(new OrderLineJpaEntity(line)));
         apply(order);
     }
@@ -88,9 +82,27 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
         }
     }
 
-    Order toDomain() {
-        List<OrderLine> domainLines = lines.stream().map(OrderLineJpaEntity::toDomain).toList();
-        return Order.restore(getId(), worksiteId, warehouseId, requestedBy, notes, requiredDate, placedAt, domainLines,
-                status, rejectionReason, decidedBy, decidedAt, getVersion());
+    List<UUID> materialIds() {
+        return lines.stream().map(OrderLineJpaEntity::materialId).toList();
+    }
+
+    List<UUID> lineIds() {
+        return lines.stream().map(OrderLineJpaEntity::id).toList();
+    }
+
+    /**
+     * Quien pidió y cuándo son la auditoría de la fila. Las líneas van ordenadas por SKU.
+     *
+     * @param materials copia local de los materiales, por id
+     * @param received  lo ya ingresado a la obra, por id de línea
+     */
+    Order toDomain(Map<UUID, Material> materials, Map<UUID, BigDecimal> received) {
+        List<OrderLine> domainLines = lines.stream()
+                .map(line -> line.toDomain(materials.get(line.materialId()),
+                        received.getOrDefault(line.id(), BigDecimal.ZERO)))
+                .sorted(Comparator.comparing(OrderLine::sku, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        return Order.restore(getId(), worksiteId, warehouseId, getCreatedBy(), notes, requiredDate, getCreatedAt(),
+                domainLines, status, rejectionReason, decidedBy, decidedAt, getVersion());
     }
 }

@@ -49,14 +49,14 @@ public class ReceptionQueryService {
     @Transactional(readOnly = true)
     public ComparisonView comparison(UUID receptionId) {
         Reception reception = visible(receptionId);
-        Order order = orders.findById(reception.orderId())
+        Order order = reception.orderId() == null ? null : orders.findById(reception.orderId())
                 .orElseThrow(() -> OrderingErrors.receptionNotFound(receptionId));
         Map<UUID, Material> materials = directory.findMaterials(
                 reception.lines().stream().map(ReceptionLine::materialId).toList());
         List<ComparisonView.Line> lines = reception.lines().stream().map(line -> {
             Material material = materials.get(line.materialId());
-            BigDecimal requested = order.lines().stream().filter(candidate -> Objects.equals(candidate.id(),
-                    line.orderLineId())).findFirst().map(OrderLine::requested).orElse(null);
+            BigDecimal requested = order == null ? null : order.lines().stream().filter(candidate -> Objects.equals(
+                    candidate.id(), line.orderLineId())).findFirst().map(OrderLine::requested).orElse(null);
             BigDecimal tolerance = material == null ? BigDecimal.ZERO : material.tolerancePercent();
             Boolean within = line.isRecorded() ? Shrinkage.withinTolerance(line.shrinkagePercent(), tolerance) : null;
             return new ComparisonView.Line(line.id(), line.materialId(), material == null ? null : material.sku(),

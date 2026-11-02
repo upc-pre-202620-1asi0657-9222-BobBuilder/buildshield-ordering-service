@@ -31,10 +31,10 @@ public class TransitIncidentJpaEntity extends OrganizationScopedEntity {
     @Column(name = "observation", nullable = false, length = 500, updatable = false)
     private String observation;
 
-    @Column(name = "reported_by", nullable = false, updatable = false)
+    @Column(name = "created_by", nullable = false, updatable = false)
     private UUID reportedBy;
 
-    @Column(name = "reported_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant reportedAt;
 
     protected TransitIncidentJpaEntity() {

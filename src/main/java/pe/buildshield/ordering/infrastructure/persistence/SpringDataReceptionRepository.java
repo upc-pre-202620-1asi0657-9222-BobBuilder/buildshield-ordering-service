@@ -8,10 +8,12 @@ import java.util.UUID;
 
 interface SpringDataReceptionRepository extends JpaRepository<ReceptionJpaEntity, UUID> {
 
-    /** La recepción y sus líneas en una sola consulta (cotejo sin N+1). */
-    @Query("SELECT DISTINCT r FROM ReceptionJpaEntity r LEFT JOIN FETCH r.lines WHERE r.id = :id")
+    /** La recepción, su despacho y sus líneas con la línea del despacho, en una sola consulta (cotejo sin N+1). */
+    @Query("""
+            SELECT DISTINCT r FROM ReceptionJpaEntity r JOIN FETCH r.dispatch
+            LEFT JOIN FETCH r.lines l LEFT JOIN FETCH l.dispatchLine WHERE r.id = :id""")
     Optional<ReceptionJpaEntity> findWithLines(UUID id);
 
-    @Query("SELECT r.id FROM ReceptionJpaEntity r WHERE r.dispatchId = :dispatchId")
+    @Query("SELECT r.id FROM ReceptionJpaEntity r WHERE r.dispatch.id = :dispatchId")
     Optional<UUID> findIdByDispatchId(UUID dispatchId);
 }

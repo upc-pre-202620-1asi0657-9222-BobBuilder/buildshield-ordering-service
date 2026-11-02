@@ -2,12 +2,14 @@ package pe.buildshield.ordering.domain.model.dispatch;
 
 /**
  * Tipo de despacho (US23): {@code COMPLETE} si con él ya no queda nada pendiente del pedido;
- * {@code PARTIAL} si el pedido se atiende en varios despachos y todavía queda algo pendiente.
+ * {@code PARTIAL} si el pedido se atiende en varios despachos y todavía queda algo pendiente;
+ * {@code RETURN} si devuelve material a un almacén, sin pedido.
  */
 public enum DispatchType {
 
     COMPLETE("Completo"),
-    PARTIAL("Parcial");
+    PARTIAL("Parcial"),
+    RETURN("Retorno");
 
     private final String label;
 

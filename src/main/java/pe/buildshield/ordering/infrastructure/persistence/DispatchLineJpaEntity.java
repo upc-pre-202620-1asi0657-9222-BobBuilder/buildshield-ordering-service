@@ -18,7 +18,7 @@ public class DispatchLineJpaEntity extends OrganizationScopedEntity {
     @Id
     private UUID id;
 
-    @Column(name = "order_line_id", nullable = false, updatable = false)
+    @Column(name = "order_line_id", updatable = false)
     private UUID orderLineId;
 
     @Column(name = "material_id", nullable = false, updatable = false)
@@ -35,6 +35,22 @@ public class DispatchLineJpaEntity extends OrganizationScopedEntity {
         orderLineId = line.orderLineId();
         materialId = line.materialId();
         quantity = line.quantity();
+    }
+
+    public UUID id() {
+        return id;
+    }
+
+    public UUID orderLineId() {
+        return orderLineId;
+    }
+
+    public UUID materialId() {
+        return materialId;
+    }
+
+    public BigDecimal quantity() {
+        return quantity;
     }
 
     DispatchLine toDomain() {

@@ -106,11 +106,12 @@ public class OrganizationSteps {
     private void assign(String email, String site, String type, String eventType) {
         String key = email + "|" + site;
         UUID id = assignments.computeIfAbsent(key, ignored -> UUID.randomUUID());
-        boolean active = "StaffAssigned".equals(eventType);
+        long expected = "StaffAssigned".equals(eventType) ? 1 : 0;
         kafka.send(Topics.ORGANIZATION, id.toString(), TestEvents.assignment(json, eventType, session.organization(), id,
                 session.id(email), session.id(site), type));
-        awaitRow(() -> count("SELECT count(*) FROM assignment_projection WHERE assignment_id = ? AND active = ?", id,
-                active));
+        await().atMost(TIMEOUT).pollInSameThread().pollInterval(Duration.ofMillis(50)).until(
+                () -> jdbc.queryForObject("SELECT count(*) FROM assignment_projection WHERE assignment_id = ?", Long.class,
+                        id), value -> value == expected);
     }
 
     private void awaitRow(Callable<Long> count) {

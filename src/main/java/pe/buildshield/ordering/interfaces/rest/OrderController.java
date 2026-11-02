@@ -140,7 +140,7 @@ class OrderController {
             @NotNull UUID worksiteId,
             @Schema(description = "Almacén al que se pide") @NotNull UUID warehouseId,
             @Size(max = 500) String notes,
-            @Schema(description = "Fecha en que la obra necesita el material (opcional)", example = "2026-11-10")
+            @Schema(description = "Fecha en que la obra necesita el material (opcional; por defecto, el día en que se crea el pedido)", example = "2026-11-10")
             LocalDate requiredDate,
             @NotEmpty List<@Valid LineRequest> lines) {
     }

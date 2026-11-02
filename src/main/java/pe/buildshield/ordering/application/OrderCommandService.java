@@ -16,7 +16,9 @@ import pe.buildshield.ordering.shared.messaging.OutboxWriter;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,8 +64,10 @@ public class OrderCommandService {
         }
         List<OrderLine> lines = command.lines() == null ? List.of()
                 : command.lines().stream().map(this::line).toList();
+        Instant now = clock.instant();
         Order order = Order.place(command.worksiteId(), command.warehouseId(), requester, command.notes(),
-                command.requiredDate(), lines, clock.instant());
+                command.requiredDate() == null ? LocalDate.ofInstant(now, ZoneOffset.UTC) : command.requiredDate(), lines,
+                now);
         Order saved = orders.save(order);
         outbox.append(OrderingEvents.ORDER_REGISTERED, OrderingEvents.ORDER, saved.id(),
                 OrderingEvents.OrderRegistered.of(saved));
@@ -156,7 +160,7 @@ public class OrderCommandService {
                 .orElseThrow(() -> OrderingErrors.orderNotFound(orderId));
     }
 
-    /** @param requiredDate fecha en que la obra necesita el material (opcional) */
+    /** @param requiredDate fecha en que la obra necesita el material; si no se indica, el día en que se crea el pedido */
     public record PlaceOrder(UUID worksiteId, UUID warehouseId, String notes, LocalDate requiredDate,
             List<LineRequest> lines) {
     }

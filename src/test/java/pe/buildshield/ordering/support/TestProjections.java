@@ -15,9 +15,9 @@ public final class TestProjections {
 
     public static UUID location(JdbcTemplate jdbc, UUID organizationId, String type, String name, boolean active) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO location_projection (location_id, organization_id, type, name, address, district, "
-                        + "city, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, organizationId, type, name, "Av. Principal 100", "Miraflores", "Lima", active, now());
+        jdbc.update("INSERT INTO location_projection (location_id, organization_id, type, name, address, active, "
+                        + "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id, organizationId, type, name, "Av. Principal 100, Miraflores, Lima", active, now());
         return id;
     }
 
@@ -32,7 +32,7 @@ public final class TestProjections {
 
     public static void assign(JdbcTemplate jdbc, UUID organizationId, UUID userId, UUID locationId, String type) {
         jdbc.update("INSERT INTO assignment_projection (assignment_id, organization_id, user_id, location_id, "
-                        + "location_type, active, updated_at) VALUES (?, ?, ?, ?, ?, true, ?)",
+                        + "location_type, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), organizationId, userId, locationId, type, now());
     }
 

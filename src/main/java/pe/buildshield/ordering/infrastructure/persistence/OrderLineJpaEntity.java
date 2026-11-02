@@ -4,13 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import pe.buildshield.ordering.application.OrganizationDirectory.Material;
 import pe.buildshield.ordering.shared.persistence.OrganizationScopedEntity;
 import pe.buildshield.ordering.domain.model.order.OrderLine;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Tabla order_lines; lleva organization_id como toda tabla de negocio. */
+/** Tabla order_lines. El SKU y la unidad salen de material_projection y lo recibido, de reception_lines. */
 @Entity
 @Table(name = "order_lines")
 public class OrderLineJpaEntity extends OrganizationScopedEntity {
@@ -21,12 +22,6 @@ public class OrderLineJpaEntity extends OrganizationScopedEntity {
     @Column(name = "material_id", nullable = false, updatable = false)
     private UUID materialId;
 
-    @Column(name = "sku", nullable = false, length = 40, updatable = false)
-    private String sku;
-
-    @Column(name = "unit", nullable = false, length = 10, updatable = false)
-    private String unit;
-
     @Column(name = "requested_qty", nullable = false, precision = 14, scale = 3, updatable = false)
     private BigDecimal requestedQty;
 
@@ -36,17 +31,12 @@ public class OrderLineJpaEntity extends OrganizationScopedEntity {
     @Column(name = "cancelled_qty", nullable = false, precision = 14, scale = 3)
     private BigDecimal cancelledQty;
 
-    @Column(name = "received_qty", nullable = false, precision = 14, scale = 3)
-    private BigDecimal receivedQty;
-
     protected OrderLineJpaEntity() {
     }
 
     OrderLineJpaEntity(OrderLine line) {
         id = UUID.randomUUID();
         materialId = line.materialId();
-        sku = line.sku();
-        unit = line.unit();
         requestedQty = line.requested();
         apply(line);
     }
@@ -54,14 +44,22 @@ public class OrderLineJpaEntity extends OrganizationScopedEntity {
     void apply(OrderLine line) {
         dispatchedQty = line.dispatched();
         cancelledQty = line.cancelled();
-        receivedQty = line.received();
+    }
+
+    UUID id() {
+        return id;
     }
 
     UUID materialId() {
         return materialId;
     }
 
-    OrderLine toDomain() {
-        return OrderLine.restore(id, materialId, sku, unit, requestedQty, dispatchedQty, cancelledQty, receivedQty);
+    /**
+     * @param material copia local del material, de donde salen el SKU y la unidad
+     * @param received lo ya ingresado a la obra por esta línea, sumado de reception_lines
+     */
+    OrderLine toDomain(Material material, BigDecimal received) {
+        return OrderLine.restore(id, materialId, material == null ? null : material.sku(),
+                material == null ? null : material.unit(), requestedQty, dispatchedQty, cancelledQty, received);
     }
 }

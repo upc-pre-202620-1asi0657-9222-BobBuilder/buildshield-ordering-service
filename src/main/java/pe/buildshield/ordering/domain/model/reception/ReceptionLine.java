@@ -37,7 +37,7 @@ public class ReceptionLine {
             BigDecimal receivedQty, BigDecimal stockedQty, BigDecimal shrinkagePercent) {
         this.id = id;
         this.dispatchLineId = Objects.requireNonNull(dispatchLineId, "dispatchLineId");
-        this.orderLineId = Objects.requireNonNull(orderLineId, "orderLineId");
+        this.orderLineId = orderLineId;
         this.materialId = Objects.requireNonNull(materialId, "materialId");
         if (dispatchedQty == null || dispatchedQty.signum() <= 0) {
             throw new IllegalStateException("Lo despachado debe ser mayor que cero");

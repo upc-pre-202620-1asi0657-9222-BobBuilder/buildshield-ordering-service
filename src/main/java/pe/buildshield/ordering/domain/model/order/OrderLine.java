@@ -37,8 +37,8 @@ public class OrderLine {
             BigDecimal cancelled, BigDecimal received) {
         this.id = id;
         this.materialId = Objects.requireNonNull(materialId, "materialId");
-        this.sku = Objects.requireNonNull(sku, "sku");
-        this.unit = Objects.requireNonNull(unit, "unit");
+        this.sku = sku;
+        this.unit = unit;
         this.requested = positive(requested, "requested");
         this.dispatched = notNegative(dispatched, "dispatched");
         this.cancelled = notNegative(cancelled, "cancelled");
@@ -52,7 +52,8 @@ public class OrderLine {
     }
 
     public static OrderLine request(UUID materialId, String sku, String unit, BigDecimal requested) {
-        return new OrderLine(null, materialId, sku, unit, requested, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        return new OrderLine(null, materialId, Objects.requireNonNull(sku, "sku"), Objects.requireNonNull(unit, "unit"),
+                requested, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     /** Línea guardada, con su identificador (los despachos la referencian por id). */

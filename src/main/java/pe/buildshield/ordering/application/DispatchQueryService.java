@@ -63,7 +63,7 @@ public class DispatchQueryService {
         List<Dispatch> candidates = access.isAdministrator() ? dispatches.findAll()
                 : dispatches.findBySites(access.assignedSites());
         List<Dispatch> visible = candidates.stream()
-                .filter(dispatch -> orderId == null || dispatch.orderId().equals(orderId))
+                .filter(dispatch -> orderId == null || orderId.equals(dispatch.orderId()))
                 .filter(dispatch -> status == null || dispatch.status() == status)
                 .toList();
         Map<UUID, Integer> counts = incidents.countByDispatchIds(visible.stream().map(Dispatch::id).toList());
@@ -86,7 +86,8 @@ public class DispatchQueryService {
                 .orElseThrow(() -> OrderingErrors.dispatchNotFound(dispatchId));
         Location warehouse = directory.findWarehouse(dispatch.warehouseId())
                 .orElseThrow(() -> OrderingErrors.dispatchNotFound(dispatchId));
-        Instant orderPlacedAt = orders.findById(dispatch.orderId()).map(Order::placedAt).orElse(null);
+        Instant orderPlacedAt = dispatch.orderId() == null ? null
+                : orders.findById(dispatch.orderId()).map(Order::placedAt).orElse(null);
         Map<UUID, Material> materials = directory.findMaterials(
                 dispatch.lines().stream().map(DispatchLine::materialId).toList());
         List<ManifestView.Line> lines = dispatch.lines().stream().map(line -> {
@@ -97,7 +98,7 @@ public class DispatchQueryService {
         }).toList();
         String code = dispatch.manifestCode().value();
         return new ManifestView(code, view(dispatch), dispatch.orderId(), orderPlacedAt,
-                new ManifestView.Site(worksite.id(), worksite.name(), worksite.fullAddress()),
+                new ManifestView.Site(worksite.id(), worksite.name(), worksite.address()),
                 new ManifestView.Site(warehouse.id(), warehouse.name(), warehouse.address()), lines,
                 Base64.getEncoder().encodeToString(qrCode.png(code)), code);
     }
