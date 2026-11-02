@@ -50,7 +50,22 @@ Se leen de la copia local, como pide el ERD.
 - `location_projection.address` de una obra guarda dirección, distrito y ciudad unidos, recortados a 200 caracteres. Es lo que el manifiesto ya mostraba. De un almacén se guarda solo la dirección, que es lo que mostraba: su distrito y ciudad no se usaban y se quitaron.
 - `assignment_projection`: `StaffUnassigned` borra la fila. Las asignaciones ya inactivas se borraron al migrar; el historial sigue en organization.
 
-## Abierto: lo que el esquema admite y el servicio todavía no usa
+## Despachos de retorno
 
-- **Despacho de retorno.** `dispatches.order_id`, `dispatch_lines.order_line_id` y el tipo `RETURN` ya están, y un retorno existente se lee, se cancela y se recibe sin tocar pedidos. No hay caso de uso ni endpoint para crearlo.
-- **`transit_incidents.photo_url`.** La columna existe, siempre nula. La API de incidencias no la recibe ni la devuelve.
+Salen de los eventos de la devolución de inventario; ver el README. No agregan columnas al ERD:
+
+- **`dispatches.id` deriva de la devolución.** Un UUID versión 3 de `balance-return:<returnId>`. El ERD no tiene dónde guardar la devolución en `dispatches`, y así la llave primaria impide dos despachos para una devolución. De la devolución al despacho se llega por `balance_returns.return_dispatch_id`, en inventory.
+- **`receivedAt` de un retorno es `dispatches.updated_at`.** No tiene recepción de donde leerlo y el ERD no tiene esa columna. Un retorno recibido no vuelve a cambiar. Es la hora en que ordering procesó el evento; la de la verificación está en `balance_returns.received_at`.
+- **`carrier_*` son nulos y no hay pesaje en un retorno.** La devolución de inventario no los registra. Por eso V5 quita a los `RETURN` la exigencia de transportista de `ck_dispatches_carrier`; los demás despachos siguen sin poder salir sin él, y `departed_at` se sigue exigiendo a todos.
+- **Incidencias en un retorno**: las registran, como en cualquier despacho, el administrador y el encargado del almacén, aunque el material venga de la obra.
+- **Devoluciones que ya estaban en tránsito antes de este cambio** no tienen despacho: su `MaterialReturnReceived` se registra en el log y se ignora.
+
+## Componentes frente a la tabla de la tarea
+
+`OrdersController`, `DispatchesController`, `ReceptionsController`, `OrdersCommandService`, `OrdersQueryService`, `OrdersOutboxPublisher`, `EvidenceStorageAdapter` y `StockEventConsumer` tienen el nombre de la tabla.
+
+**Partición que sigue**: los casos de uso de despachos y recepciones están en `DispatchCommandService`, `DispatchQueryService`, `ReceptionCommandService` y `ReceptionQueryService`, y los repositorios son uno por agregado. La tarea permite partir el controlador y el repositorio, pero no menciona los servicios. No se juntaron en `OrdersCommandService` y `OrdersQueryService` porque daría una clase de más de 600 líneas sin ganar nada.
+
+## Abierto
+
+- **Foto de la incidencia**: `photo_url` guarda la URL que manda el cliente, como las fotos de los pesajes. `EvidenceStorageAdapter` todavía no sube a Amazon S3.

@@ -11,7 +11,7 @@ en obra (cotejo, recepción parcial, pesaje de llegada y conformidad). Contrato 
 | Base | `ordering_db` (PostgreSQL 16+), rol `ordering_service` |
 | Paquete | `pe.buildshield.ordering` (kernel compartido copiado de iam en `pe.buildshield.ordering.shared`) |
 | Publica | `buildshield.ordering` (outbox, clave = `aggregateId`) |
-| Consume | `buildshield.organization` (copias locales) y `buildshield.inventory` (respuesta de la saga) |
+| Consume | `buildshield.organization` (copias locales) y `buildshield.inventory` (respuesta de la saga y devoluciones de saldos) |
 
 ## Componentes (C4 de la v4)
 
@@ -19,8 +19,8 @@ en obra (cotejo, recepción parcial, pesaje de llegada y conformidad). Contrato 
 `DispatchCommandService`, `DispatchQueryService`, `ReceptionCommandService`, `ReceptionQueryService` → agregados
 `Order`, `Dispatch`, `Reception` → `*Repository` (Spring Data JPA detrás de puertos del dominio). Además:
 `OrdersOutboxPublisher` (cada 500 ms), `StockEventConsumer` (tópicos de inventario y de organización),
-`EvidenceStorageAdapter` (local: valida y guarda la URL http(s) de la foto del ticket; en producción lo reemplaza un
-adaptador de Amazon S3, todavía no implementado) y `ZxingManifestQrCode` (QR del manifiesto).
+`EvidenceStorageAdapter` (local: valida y guarda la URL http(s) de la foto del ticket o de la incidencia; en producción
+lo reemplaza un adaptador de Amazon S3, todavía no implementado) y `ZxingManifestQrCode` (QR del manifiesto).
 
 ## Eventos
 
@@ -29,10 +29,29 @@ adaptador de Amazon S3, todavía no implementado) y `ZxingManifestQrCode` (QR de
 | `OrderRegistered`, `OrderApproved`, `OrderRejected`, `OrderClosed` | `buildshield.organization`: `LocationRegistered`, `LocationUpdated` → `location_projection` |
 | `DispatchPrepared`, `DispatchCarrierAssigned`, `DispatchDepartureWeighed`, `DispatchDeparted`, `DispatchCancelled`, `TransitIncidentReported` | `MaterialRegistered`, `MaterialUpdated` → `material_projection` |
 | `ReceptionOpened`, `ArrivalWeighed`, `ReceptionPartiallyReceived`, `ReceptionConfirmed` | `StaffAssigned`, `StaffUnassigned` → `assignment_projection` |
-| | `buildshield.inventory`: `StockReserved`, `StockReservationRejected` (saga) |
+| `ReturnDispatchCreated`, `ReturnDispatchClosed` | `buildshield.inventory`: `StockReserved`, `StockReservationRejected` (saga); `MaterialReturnDispatched`, `MaterialReturnReceived` (despachos de retorno) |
 
 Los campos de cada payload están en `notas-etapa-b1.md` §2 y los prueba `OrderingEventsJsonTest` y `OrderingMessagingIT`.
-Cada consumo es idempotente (`processed_events`).
+Cada consumo es idempotente (`processed_events`). Todos los eventos llevan `worksiteName` y `warehouseName` (null si el
+lugar aún no llegó a `location_projection`), y `ReceptionPartiallyReceived` lleva `dispatchLineId` en cada línea.
+
+## Despachos de retorno
+
+Una devolución de saldos la gestiona inventario, con su stock. Ordering solo la refleja como despacho, por eventos:
+
+1. `MaterialReturnDispatched` crea un despacho `RETURN`, en tránsito, sin pedido, con `orderLineId` nulo en sus líneas,
+   un manifiesto propio y `warehouseId` como destino y `worksiteId` como origen. Publica `ReturnDispatchCreated`
+   (`returnId`, `dispatchId`, `manifestCode`, `warehouseId`, `warehouseName`, `worksiteId`, `worksiteName`, `status`,
+   `departedAt`, `lines`), con el que inventario guarda `return_dispatch_id`.
+2. `MaterialReturnReceived` lo deja `RECEIVED`, sin recepción y sin tocar pedidos. Publica `ReturnDispatchClosed`
+   (`returnId`, `dispatchId`, `manifestCode`, `warehouseId`, `warehouseName`, `worksiteId`, `worksiteName`, `status`,
+   `receivedAt`).
+
+El id del despacho se deriva del id de la devolución (`Dispatch.returnDispatchId`), así que la llave primaria impide dos
+despachos para una devolución, aunque llegue otro evento con otro `eventId`. No publica `DispatchDeparted` ni
+`ReceptionConfirmed`, y `POST /receptions` responde 409 `RETURN_DISPATCH_NOT_RECEIVABLE`: el stock lo mueve solo inventario.
+No hay endpoint para crearlos; se leen con los `GET /dispatches` de siempre. Una devolución anulada o rechazada no llega a
+`MaterialReturnDispatched` y no crea nada.
 
 ## Saga de reserva de stock (coreografiada)
 
@@ -52,7 +71,7 @@ Cada consumo es idempotente (`processed_events`).
 - Despachos: `POST /dispatches`, `GET /dispatches?orderId=&status=` (cada uno con `incidentCount`, US31),
   `GET /dispatches/{id}`, `GET /dispatches/by-manifest/{code}` (US26), `PATCH /dispatches/{id}/carrier`,
   `POST /dispatches/{id}/departure-weighing`, `POST /dispatches/{id}/depart`, `POST /dispatches/{id}/cancel` (US25),
-  `POST` y `GET /dispatches/{id}/incidents` (US32), `GET /dispatches/{id}/manifest`.
+  `POST` y `GET /dispatches/{id}/incidents` (US32, con `photoUrl` opcional), `GET /dispatches/{id}/manifest`.
 - Recepciones: `POST /receptions` (`{"dispatchId"}` o `{"manifestCode"}`, US34), `GET /receptions/{id}`,
   `PUT /receptions/{id}/lines/{lineId}`, `GET /receptions/{id}/comparison`, `POST /receptions/{id}/partial` (US38, sin
   cuerpo), `POST /receptions/{id}/confirm`, `POST /receptions/{id}/arrival-weighing` (US29).
@@ -90,6 +109,8 @@ mvn -B verify -Dbuildshield.test.external-database=true
   ArchUnit.
 - `*IT` contra la base temporal `ordering_it` en `127.0.0.1:5433` (usuario `buildshield_core`) y Kafka embebido:
   salud, OpenAPI completo, persistencia, aislamiento multiempresa y mensajería (outbox, saga, duplicados, proyecciones).
-- Cucumber (`features/`, en español): historias US18 a US38 del Sprint 2 y del Sprint 3. Los datos de organization
+- Cucumber (`features/`, en español): historias US18 a US38 del Sprint 2 y del Sprint 3, y US43 (despacho de retorno). Los datos de organization
   llegan por eventos a Kafka y la saga la responde un inventario simulado (`FakeInventory`, solo en pruebas).
+- Kafka es siempre el embebido: el recorrido de la devolución entre ordering e inventario se prueba en cada servicio con
+  eventos escritos a mano, no con los dos servicios corriendo juntos.
 - JaCoCo exige 80 % de líneas en `domain` y `application`.
