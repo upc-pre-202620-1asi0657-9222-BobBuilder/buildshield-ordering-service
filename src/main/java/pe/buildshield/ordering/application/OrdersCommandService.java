@@ -72,6 +72,25 @@ public class OrdersCommandService {
     }
 
     /**
+     * US19: el encargado de obra corrige su pedido mientras sigue Registrado. Solo un encargado asignado a la obra del
+     * pedido; para el resto el pedido no existe. Los materiales se validan igual que al crearlo y se publica
+     * {@code OrderUpdated}.
+     */
+    @Transactional
+    public OrderView edit(UUID orderId, EditOrder command) {
+        Order order = orders.findById(orderId)
+                .filter(found -> access.isAssigned(found.worksiteId()))
+                .orElseThrow(() -> OrderingErrors.orderNotFound(orderId));
+        List<OrderLine> lines = command.lines() == null ? List.of()
+                : command.lines().stream().map(this::line).toList();
+        order.edit(command.notes(), command.requiredDate(), lines);
+        Order saved = orders.save(order);
+        outbox.append(OrderingEvents.ORDER_UPDATED, OrderingEvents.ORDER, saved.id(),
+                OrderingEvents.OrderRegistered.of(saved, names(saved)));
+        return OrderView.of(saved);
+    }
+
+    /**
      * US20, saga paso 1: aprueba el encargado del almacén de origen o el administrador. El pedido queda Aprobando
      * y se publica {@code OrderApproved}; inventario reserva y responde de forma asíncrona.
      */
@@ -164,6 +183,10 @@ public class OrdersCommandService {
     /** @param requiredDate fecha en que la obra necesita el material; opcional */
     public record PlaceOrder(UUID worksiteId, UUID warehouseId, String notes, LocalDate requiredDate,
             List<LineRequest> lines) {
+    }
+
+    /** US19: datos corregidos; reemplazan a los anteriores (las líneas, completas). */
+    public record EditOrder(String notes, LocalDate requiredDate, List<LineRequest> lines) {
     }
 
     public record LineRequest(UUID materialId, BigDecimal quantity) {

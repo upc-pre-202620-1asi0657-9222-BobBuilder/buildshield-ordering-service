@@ -20,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,7 +38,8 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/orders")
-@Tag(name = "Pedidos", description = "US18 crear, US20 aprobar o rechazar (saga de reserva de stock), US21 consultar estado")
+@Tag(name = "Pedidos", description = "US18 crear, US19 editar antes de la aprobación, US20 aprobar o rechazar (saga de "
+        + "reserva de stock), US21 consultar estado")
 @SecurityRequirement(name = "bearer")
 class OrdersController {
 
@@ -97,6 +99,31 @@ class OrdersController {
         return OrderResource.of(queries.get(id));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SITE_MANAGER')")
+    @Operation(summary = "Editar un pedido antes de su aprobación",
+            description = "US19. El encargado de obra corrige observaciones, fecha requerida y materiales mientras el "
+                    + "pedido está Registrado (también si inventario no pudo reservar). Las líneas enviadas reemplazan a "
+                    + "las anteriores. Se publica OrderUpdated. Requiere Idempotency-Key.")
+    @ApiResponse(responseCode = "200", description = "Pedido actualizado",
+            content = @Content(schema = @Schema(implementation = OrderResource.class),
+                    examples = @ExampleObject(value = OrderApiExamples.ORDER_REGISTERED)))
+    @ApiResponse(responseCode = "400", description = "Sin líneas, cantidades no positivas o material repetido",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "403", description = "Solo el encargado de obra edita pedidos",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "No existe, es de otra organización o de una obra no asignada",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "El pedido ya fue aprobado, rechazado o despachado "
+            + "(INVALID_ORDER_TRANSITION), o un material está retirado (MATERIAL_INACTIVE)",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    OrderResource edit(@Parameter(description = "Id del pedido", example = OrderApiExamples.ORDER_ID) @PathVariable UUID id,
+            @Valid @RequestBody EditOrderRequest request) {
+        return OrderResource.of(commands.edit(id, new OrdersCommandService.EditOrder(request.notes(),
+                request.requiredDate(), request.lines().stream()
+                .map(line -> new OrdersCommandService.LineRequest(line.materialId(), line.quantity())).toList())));
+    }
+
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'WAREHOUSE_MANAGER')")
     @Operation(summary = "Aprobar un pedido",
@@ -141,6 +168,14 @@ class OrdersController {
             @Schema(description = "Almacén al que se pide") @NotNull UUID warehouseId,
             @Size(max = 500) String notes,
             @Schema(description = "Fecha en que la obra necesita el material (opcional)", example = "2026-11-10")
+            LocalDate requiredDate,
+            @NotEmpty List<@Valid LineRequest> lines) {
+    }
+
+    @Schema(description = "Pedido corregido: reemplaza observaciones, fecha y líneas")
+    record EditOrderRequest(
+            @Size(max = 500) String notes,
+            @Schema(description = "Fecha en que la obra necesita el material (opcional)", example = "2026-11-12")
             LocalDate requiredDate,
             @NotEmpty List<@Valid LineRequest> lines) {
     }

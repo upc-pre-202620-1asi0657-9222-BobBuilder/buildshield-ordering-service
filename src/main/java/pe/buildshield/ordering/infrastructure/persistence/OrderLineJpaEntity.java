@@ -22,7 +22,7 @@ public class OrderLineJpaEntity extends OrganizationScopedEntity {
     @Column(name = "material_id", nullable = false, updatable = false)
     private UUID materialId;
 
-    @Column(name = "requested_qty", nullable = false, precision = 14, scale = 3, updatable = false)
+    @Column(name = "requested_qty", nullable = false, precision = 14, scale = 3)
     private BigDecimal requestedQty;
 
     @Column(name = "dispatched_qty", nullable = false, precision = 14, scale = 3)
@@ -37,11 +37,12 @@ public class OrderLineJpaEntity extends OrganizationScopedEntity {
     OrderLineJpaEntity(OrderLine line) {
         id = UUID.randomUUID();
         materialId = line.materialId();
-        requestedQty = line.requested();
         apply(line);
     }
 
+    /** Lo solicitado solo cambia al editar un pedido Registrado (US19); lo despachado y cancelado, durante su vida. */
     void apply(OrderLine line) {
+        requestedQty = line.requested();
         dispatchedQty = line.dispatched();
         cancelledQty = line.cancelled();
     }

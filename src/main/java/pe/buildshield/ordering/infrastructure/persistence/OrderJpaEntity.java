@@ -35,10 +35,10 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
     @Column(name = "warehouse_id", nullable = false, updatable = false)
     private UUID warehouseId;
 
-    @Column(name = "notes", length = 500, updatable = false)
+    @Column(name = "notes", length = 500)
     private String notes;
 
-    @Column(name = "required_date", updatable = false)
+    @Column(name = "required_date")
     private LocalDate requiredDate;
 
     @Enumerated(EnumType.STRING)
@@ -71,14 +71,22 @@ public class OrderJpaEntity extends AuditableAbstractAggregateRoot<OrderJpaEntit
         apply(order);
     }
 
-    /** Copia lo que cambia durante la vida del pedido: estado, decisión y cantidades de cada línea. */
+    /**
+     * Copia lo que cambia durante la vida del pedido: estado, decisión y cantidades de cada línea. Mientras está
+     * Registrado (US19) también cambian las observaciones, la fecha requerida y qué materiales lleva: una línea se
+     * reconoce por su material.
+     */
     void apply(Order order) {
         status = order.status();
         rejectionReason = order.rejectionReason();
         decidedBy = order.decidedBy();
         decidedAt = order.decidedAt();
-        for (OrderLineJpaEntity line : lines) {
-            line.apply(order.line(line.materialId()));
+        notes = order.notes();
+        requiredDate = order.requiredDate();
+        lines.removeIf(entity -> order.lines().stream().noneMatch(line -> line.materialId().equals(entity.materialId())));
+        for (OrderLine line : order.lines()) {
+            lines.stream().filter(entity -> entity.materialId().equals(line.materialId())).findFirst()
+                    .ifPresentOrElse(entity -> entity.apply(line), () -> lines.add(new OrderLineJpaEntity(line)));
         }
     }
 

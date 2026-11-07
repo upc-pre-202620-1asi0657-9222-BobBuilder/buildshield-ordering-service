@@ -271,4 +271,46 @@ class OrderTest {
         assertThatThrownBy(() -> order.registerReceived(Map.of(CEMENT_LINE, new BigDecimal("2"))))
                 .isInstanceOf(ValidationException.class).hasFieldOrPropertyWithValue("code", "RECEIVED_EXCEEDS_DISPATCHED");
     }
+    @Test
+    void registered_order_can_be_edited_keeping_the_line_id_of_each_kept_material() {
+        Order order = stored(OrderStatus.REGISTERED);
+        UUID sand = UUID.randomUUID();
+
+        order.edit(" Entregar temprano ", REQUIRED, List.of(line(CEMENT, "CEM-001", "70"), line(sand, "ARE-001", "5")));
+
+        assertThat(order.lines()).hasSize(2);
+        assertThat(order.line(CEMENT).id()).isEqualTo(CEMENT_LINE);
+        assertThat(order.line(CEMENT).requested()).isEqualByComparingTo("70");
+        assertThat(order.line(sand).id()).isNull();
+        assertThatThrownBy(() -> order.line(STEEL)).isInstanceOf(ValidationException.class);
+        assertThat(order.notes()).isEqualTo("Entregar temprano");
+        assertThat(order.requiredDate()).isEqualTo(REQUIRED);
+        assertThat(order.status()).isEqualTo(OrderStatus.REGISTERED);
+    }
+
+    @Test
+    void edit_follows_the_same_rules_as_placing_and_clears_the_reservation_reason() {
+        Order order = stored(OrderStatus.APPROVAL_PENDING);
+        order.rejectReservation("Sin stock de cemento");
+
+        order.edit(null, null, List.of(line(CEMENT, "CEM-001", "20")));
+        assertThat(order.rejectionReason()).isNull();
+
+        assertThatThrownBy(() -> order.edit(null, null, List.of()))
+                .isInstanceOf(ValidationException.class).hasFieldOrPropertyWithValue("code", "ORDER_WITHOUT_LINES");
+        assertThatThrownBy(() -> order.edit(null, null,
+                List.of(line(CEMENT, "CEM-001", "5"), line(CEMENT, "CEM-001", "6"))))
+                .isInstanceOf(ValidationException.class).hasFieldOrPropertyWithValue("code", "DUPLICATE_MATERIAL");
+    }
+
+    @Test
+    void order_already_sent_to_the_warehouse_flow_cannot_be_edited() {
+        for (OrderStatus status : List.of(OrderStatus.APPROVAL_PENDING, OrderStatus.IN_REVIEW,
+                OrderStatus.PARTIALLY_FULFILLED, OrderStatus.CANCELLED)) {
+            Order order = stored(status);
+            assertThatThrownBy(() -> order.edit(null, null, List.of(line(CEMENT, "CEM-001", "1"))))
+                    .as(status.name()).isInstanceOf(InvalidOrderTransitionException.class);
+            assertThat(order.line(CEMENT).requested()).isEqualByComparingTo("50");
+        }
+    }
 }

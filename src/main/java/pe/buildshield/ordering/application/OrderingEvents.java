@@ -25,6 +25,8 @@ import java.util.UUID;
 public final class OrderingEvents {
 
     public static final String ORDER_REGISTERED = "OrderRegistered";
+    /** US19: mismo payload que {@code OrderRegistered}, con los datos ya corregidos. */
+    public static final String ORDER_UPDATED = "OrderUpdated";
     public static final String ORDER_APPROVED = "OrderApproved";
     public static final String ORDER_REJECTED = "OrderRejected";
     public static final String ORDER_CLOSED = "OrderClosed";

@@ -31,8 +31,8 @@ public class Order {
     private final UUID worksiteId;
     private final UUID warehouseId;
     private final UUID requestedBy;
-    private final String notes;
-    private final LocalDate requiredDate;
+    private String notes;
+    private LocalDate requiredDate;
     private final Instant placedAt;
     private final List<OrderLine> lines;
     private OrderState state;
@@ -62,6 +62,35 @@ public class Order {
     /** Crea el pedido en estado Registrado: al menos una línea y sin materiales repetidos. */
     public static Order place(UUID worksiteId, UUID warehouseId, UUID requestedBy, String notes, LocalDate requiredDate,
             List<OrderLine> lines, Instant now) {
+        validate(notes, lines);
+        return new Order(null, worksiteId, warehouseId, requestedBy, blankToNull(notes), requiredDate, now, lines,
+                new OrderState.Registered(), null, null, null, null);
+    }
+
+    /**
+     * US19: el encargado de obra corrige el pedido antes de que el almacén lo apruebe. Solo en Registrado (también
+     * cuando inventario no pudo reservar y el pedido volvió a Registrado). Reemplaza observaciones, fecha requerida y
+     * líneas con las mismas reglas que al crearlo; una línea que conserva su material conserva su identificador.
+     * Si el pedido ya fue aprobado, rechazado o despachado, la edición se bloquea (409).
+     */
+    public void edit(String newNotes, LocalDate newRequiredDate, List<OrderLine> newLines) {
+        if (!(state instanceof OrderState.Registered)) {
+            throw new InvalidOrderTransitionException(state.status(), "editar");
+        }
+        validate(newNotes, newLines);
+        List<OrderLine> edited = newLines.stream().map(line -> lines.stream()
+                .filter(current -> current.materialId().equals(line.materialId())).findFirst()
+                .map(current -> OrderLine.restore(current.id(), line.materialId(), line.sku(), line.unit(),
+                        line.requested(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO))
+                .orElse(line)).toList();
+        lines.clear();
+        lines.addAll(edited);
+        notes = blankToNull(newNotes);
+        requiredDate = newRequiredDate;
+        rejectionReason = null;
+    }
+
+    private static void validate(String notes, List<OrderLine> lines) {
         if (lines == null || lines.isEmpty()) {
             throw new ValidationException("ORDER_WITHOUT_LINES", "El pedido debe tener al menos un material",
                     List.of(new ErrorDetail("lines", "al menos una línea")));
@@ -77,8 +106,6 @@ public class Order {
         if (notes != null && notes.length() > MAX_TEXT) {
             throw new ValidationException("INVALID_NOTES", "Las observaciones admiten hasta 500 caracteres");
         }
-        return new Order(null, worksiteId, warehouseId, requestedBy, blankToNull(notes), requiredDate, now, lines,
-                new OrderState.Registered(), null, null, null, null);
     }
 
     public static Order restore(UUID id, UUID worksiteId, UUID warehouseId, UUID requestedBy, String notes,
