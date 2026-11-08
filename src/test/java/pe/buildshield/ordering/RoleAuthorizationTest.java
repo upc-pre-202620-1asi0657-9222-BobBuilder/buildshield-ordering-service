@@ -74,6 +74,8 @@ class RoleAuthorizationTest {
     private static final Map<String, String> BODIES = Map.ofEntries(
             Map.entry("order", "{\"worksiteId\":\"" + ID + "\",\"warehouseId\":\"" + ID + "\",\"requiredDate\":\"2026-11-10\","
                     + "\"lines\":[{\"materialId\":\"" + ID + "\",\"quantity\":5}]}"),
+            Map.entry("edit", "{\"notes\":\"Entregar por la puerta 2\",\"requiredDate\":\"2026-11-12\","
+                    + "\"lines\":[{\"materialId\":\"" + ID + "\",\"quantity\":7}]}"),
             Map.entry("reject", "{\"reason\":\"Sin transporte\"}"),
             Map.entry("dispatch", "{\"orderId\":\"" + ID + "\",\"lines\":[{\"orderLineId\":\"" + ID + "\",\"quantity\":5}]}"),
             Map.entry("carrier", "{\"carrierName\":\"Rímac\",\"carrierDocument\":\"20555666777\",\"plate\":\"ABC-123\"}"),
@@ -88,6 +90,7 @@ class RoleAuthorizationTest {
             new Object[]{"POST", "/api/v1/orders", "order", SITE_ONLY, 201},
             new Object[]{"GET", "/api/v1/orders", null, ALL, 200},
             new Object[]{"GET", "/api/v1/orders/" + ID, null, ALL, 200},
+            new Object[]{"PUT", "/api/v1/orders/" + ID, "edit", SITE_ONLY, 200},
             new Object[]{"POST", "/api/v1/orders/" + ID + "/approve", null, WAREHOUSE, 200},
             new Object[]{"POST", "/api/v1/orders/" + ID + "/reject", "reject", WAREHOUSE, 200},
             new Object[]{"POST", "/api/v1/dispatches", "dispatch", WAREHOUSE, 201},
@@ -161,6 +164,7 @@ class RoleAuthorizationTest {
                 null, null, List.of(new OrderView.LineView(ANY_ID, ANY_ID, "CEM-001", "BAG", BigDecimal.TEN,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN)));
         when(orderCommands.place(any())).thenReturn(order);
+        when(orderCommands.edit(any(), any())).thenReturn(order);
         when(orderCommands.approve(any())).thenReturn(order);
         when(orderCommands.reject(any(), any())).thenReturn(order);
         when(orderQueries.get(any())).thenReturn(order);
