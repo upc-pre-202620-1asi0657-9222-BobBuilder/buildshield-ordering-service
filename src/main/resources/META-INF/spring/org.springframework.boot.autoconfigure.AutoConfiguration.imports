@@ -1,0 +1,6 @@
+pe.buildshield.ordering.shared.config.BuildshieldClockAutoConfiguration
+pe.buildshield.ordering.shared.config.BuildshieldPersistenceAutoConfiguration
+pe.buildshield.ordering.shared.config.BuildshieldJpaAuditingAutoConfiguration
+pe.buildshield.ordering.shared.config.BuildshieldWebAutoConfiguration
+pe.buildshield.ordering.shared.config.BuildshieldSchedulingAutoConfiguration
+pe.buildshield.ordering.shared.config.BuildshieldMessagingAutoConfiguration
